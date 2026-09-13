@@ -1,12 +1,17 @@
 # week3_todo
 
-Aplikasi ToDo sederhana dengan state management **Riverpod** (v3). Berisi halaman ToDo (CRUD tugas) dan halaman Produk untuk praktikum `AsyncValue`.
+Aplikasi ToDo sederhana dengan state management **Riverpod** (v3) dan navigasi **GoRouter**. Berisi halaman ToDo (CRUD tugas), halaman Produk, dan halaman Statistik untuk praktikum `AsyncValue`.
 
 ## Fitur
-- **ToDo** (`lib/pages/todo_page.dart` + `lib/providers/todo_provider.dart`)
+- **ToDo** (`lib/pages/todo_page.dart` + `lib/providers/todo_provider.dart` + `lib/widgets/todo_tile.dart`)
   - Tambah tugas (FAB → dialog)
-  - Tandai selesai (checkbox → coret teks)
+  - Tandai selesai (checkbox → coret teks) — hanya tugas belum selesai yang ditampilkan
   - Hapus tugas
+  - `TodoTile` terpisah agar `build` pendek dan mudah diuji
+  - `pendingTodosProvider` — provider turunan yang menyaring tugas dari `todoListProvider`
+- **Navigasi** (`lib/main.dart` + `lib/pages/main_shell.dart`)
+  - GoRouter: `/` daftar, `/stats` statistik
+  - `NavigationBar` untuk berpindah; state ToDo bertahan karena `ProviderScope` membungkus root
 - **Produk** (`lib/pages/product_page.dart` + `lib/providers/products_provider.dart`)
   - Simulasi state asinkron dengan `AsyncNotifier<List<String>>`:
     `loading` → `error` → `success`
@@ -16,6 +21,17 @@ Aplikasi ToDo sederhana dengan state management **Riverpod** (v3). Berisi halama
     tombol retry), dan `success` (ListView 3 item).
   - Unit test notifier di `test/stats_provider_test.dart` (gunakan `overrideWith`
     dengan `failureRate`, `delay`, dan `Random` tiruan agar deterministik).
+
+## Refactoring & Testing
+- `flutter analyze` dan `flutter test` untuk verifikasi.
+- Widget test di `test/widget_test.dart`: memastikan UI bereaksi terhadap
+  perubahan state provider (menambah tugas baru).
+- Unit test notifier di `test/stats_provider_test.dart`; container memakai
+  `retry: (_, _) => null` agar build gagal langsung menjadi `AsyncError`
+  (Riverpod default memakai auto-retry untuk `Exception`).
+- Checklist verifikasi: navigasi GoRouter (pindah halaman & back), `ProviderScope`
+  membungkus root sehingga state ToDo bertahan, UI AsyncValue menangani
+  `loading`/`error`/`success`.
 
 ## Praktikum 3 — Uji ketiga state AsyncValue
 
@@ -88,3 +104,14 @@ lama tidak lagi valid dan menyesatkan.
    state lokal satu widget; untuk data yang dipakai banyak halaman gunakan
    provider (Riverpod/Bloc), karena `setState` akan hilang saat halaman ditutup.
 
+Tugas refactor — checklist verifikasi mandiri:
+- Navigasi GoRouter bekerja: pindah halaman, back, dan akses path detail langsung.
+- `ProviderScope` membungkus root aplikasi; state ToDo bertahan saat berpindah halaman.
+- UI AsyncValue menangani loading, error, dan success, bukan hanya success.
+- `flutter analyze` tanpa issue dan semua test lulus.
+
+Hasil: `flutter analyze` No issues found.
+
+
+flutter test
+00:08 +5: All tests passed!                                                                                 

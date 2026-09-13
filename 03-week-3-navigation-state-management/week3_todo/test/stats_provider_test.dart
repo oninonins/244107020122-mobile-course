@@ -39,6 +39,10 @@ void main() {
     // addTearDown menjamin container dibuang setelah setiap test selesai.
     ProviderContainer createContainer(StatsNotifier Function() create) {
       final container = ProviderContainer(
+        // Matikan auto-retry bawaan Riverpod (defaultRetry me-retry Exception
+        // dengan backoff). Tanpa ini, build yang selalu gagal akan nyangkut di
+        // state loading hingga timeout.
+        retry: (_, _) => null,
         overrides: [statsProvider.overrideWith(create)],
       );
       addTearDown(container.dispose);

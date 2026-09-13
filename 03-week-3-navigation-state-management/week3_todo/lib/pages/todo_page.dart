@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/todo_provider.dart';
+import '../widgets/todo_tile.dart';
 import 'product_page.dart';
-import 'stats_page.dart';
 
 class TodoPage extends ConsumerWidget {
   const TodoPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final todos = ref.watch(todoListProvider);
+    final todos = ref.watch(pendingTodosProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -23,39 +23,22 @@ class TodoPage extends ConsumerWidget {
               MaterialPageRoute(builder: (context) => const ProductPage()),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.query_stats),
-            tooltip: 'Statistik',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const StatsPage()),
-            ),
-          ),
         ],
       ),
       body: todos.isEmpty
           ? const Center(child: Text('Belum ada tugas'))
           : ListView.builder(
               itemCount: todos.length,
-              itemBuilder: (context, index) => ListTile(
-                leading: Checkbox(
-                  value: todos[index].done,
-                  onChanged: (_) =>
-                      ref.read(todoListProvider.notifier).toggle(index),
-                ),
-                title: Text(
-                  todos[index].title,
-                  style: TextStyle(
-                      decoration: todos[index].done
-                          ? TextDecoration.lineThrough
-                          : null),
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () =>
-                      ref.read(todoListProvider.notifier).remove(index),
-                ),
-              ),
+              itemBuilder: (context, index) {
+                final todo = todos[index];
+                return TodoTile(
+                  todo: todo,
+                  onToggle: (_) =>
+                      ref.read(todoListProvider.notifier).toggle(todo),
+                  onDelete: () =>
+                      ref.read(todoListProvider.notifier).remove(todo),
+                );
+              },
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddDialog(context, ref),

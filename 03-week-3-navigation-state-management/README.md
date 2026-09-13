@@ -240,3 +240,15 @@ To run this test again: C:\Users\USER\flutter\bin\cache\dart-sdk\bin\dart.exe te
 To run this test again: C:\Users\USER\flutter\bin\cache\dart-sdk\bin\dart.exe test D:/college/semester 5/PeMob/244107020122-mobile-course/03-week-3-navigation-state-management/week3_todo/test/stats_provider_test.dart -p vm --plain-name "StatsNotifier retry: build pertama gagal, lalu retry() berhasil"
 01:05 +2 -3: Some tests failed.                                                                                                     
 PS D:\college\semester 5\PeMob\244107020122-mobile-course\03-week-3-navigation-state-management\week3_todo> 
+
+## Screenshot
+
+![Sebelum AI](screenshots/before%20ai.jpeg)
+
+![AI Challenge 1](screenshots/ai%20challange.jpeg)
+
+![AI Challenge 2](screenshots/ai%20challange2.jpeg)
+
+![Setelah refactor 1](screenshots/after%20refactor.jpeg)
+
+![Setelah refactor 2](screenshots/after%20refactor2.jpeg) 

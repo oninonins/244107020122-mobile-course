@@ -1,3 +1,101 @@
+# Week 3 — Navigation & State Management (ToDo)
+
+## Tujuan
+Membangun aplikasi ToDo sebagai tugas minggu ini untuk menerapkan:
+- Navigasi minimal 2 halaman dengan **GoRouter** (daftar tugas & halaman statistik).
+- State management dengan **Riverpod** (Notifier) dan UI berbasis `ConsumerWidget`.
+- Simulasi proses asinkron dengan **AsyncValue**: state `loading`, `error`, dan
+  `success` tampil dengan benar.
+- Minimal 1 unit/widget test yang lulus.
+
+## Fitur Utama
+- **ToDo** (`week3_todo`): tambah, tandai selesai, dan hapus tugas; hanya tugas
+  yang belum selesai yang ditampilkan (`pendingTodosProvider`).
+- **Navigasi GoRouter + NavigationBar**: halaman daftar (`/`) dan statistik
+  (`/stats`); state ToDo bertahan saat berpindah halaman karena `ProviderScope`
+  membungkus root.
+- **Simulasi asinkron**: `StatsNotifier` (delay 2 detik, 30% gagal) dan
+  `ProductsNotifier`; UI menangani `loading` (spinner), `error` (pesan + tombol
+  "Coba lagi"), dan `success` (daftar data).
+
+## Stack Teknologi
+- **Flutter** (Dart, Material 3)
+- **flutter_riverpod 3.x** — `Notifier` / `AsyncNotifier` + `ConsumerWidget`
+- **go_router 18.x** — navigasi multi-halaman
+- **flutter_test** — unit test notifier & widget test
+
+## Cara Menjalankan
+```bash
+cd week3_todo
+flutter pub get
+flutter run        # jalankan aplikasi
+flutter test       # jalankan semua test
+flutter analyze    # cek statis
+```
+
+## Hasil yang Dicapai
+- 2 halaman GoRouter (`/` daftar tugas, `/stats` statistik) + `NavigationBar`.
+- State Riverpod immutable (`todo_provider.dart`), tidak ada mutasi langsung.
+- AsyncValue loading/error/success ditangani di StatsPage & ProductPage.
+- `flutter analyze`: **No issues found**.
+- `flutter test`: **5 test lulus** (4 unit test `StatsNotifier` + 1 widget test).
+
+## Refleksi
+
+### Kapan `setState` masih cukup, dan kapan state harus naik ke Riverpod?
+- `setState` cukup untuk state **ephemeral** yang hanya milik satu widget dan
+  mati saat widget dibuang: isi form/dialog, buka-tutup dialog, animasi, atau
+  indeks tab lokal. Contohnya `TextEditingController` untuk dialog "Tugas baru".
+- State harus naik ke Riverpod ketika:
+  1. dipakai oleh **dua widget/halaman atau lebih**;
+  2. harus **bertahan saat berpindah halaman** (navigasi);
+  3. berasal dari **proses asinkron** yang punya `loading`/`error`/`success` dan
+     butuh retry;
+  4. ada **state turunan/derived** (misal `pendingTodosProvider` yang membaca
+     `todoListProvider`).
+- Dalam aplikasi ini, daftar tugas naik ke `todoListProvider` karena harus
+  bertahan ketika pindah antara halaman `/` dan `/stats`.
+
+### Apa perbedaan `context.go` dan `context.push`, dan kapan masing-masing tepat digunakan?
+- `context.go('/stats')` **mengganti seluruh stack navigasi** ke lokasi baru
+  (push ke awal, back tidak kembali ke halaman sebelumnya). Cocok untuk
+  navigasi **level-atas / tab** — dipakai `NavigationBar` di
+  `main_shell.dart:19`.
+- `context.push('/detail/3')` **menumpuk route baru di atas stack**, sehingga
+  tombol back kembali ke halaman sebelumnya. Cocok untuk **detail/bertingkat**
+  — misalnya membuka halaman Produk dari daftar tugas.
+- Aturan praktis: pilih `go` kalau titik tujuan "menggantikan" layar saat ini,
+  pilih `push` jika pengguna harus bisa kembali ke layar asal.
+
+### Bagaimana `AsyncValue` mencegah bug dibanding tiga boolean terpisah?
+- Tiga boolean (`isLoading`, `isError`, `isSuccess`) memungkinkan **kombinasi
+  ilegal** (misal `isLoading` dan `isError` sekaligus) dan rawan lupa me-reset.
+- `AsyncValue` menjamin **tepat satu** dari `loading`/`error`/`data`, dan
+  transisinya dikelola Riverpod (misal `loading → data` atau `loading →
+  error`), sehingga UI tidak mengalami dua kondisi sekaligus.
+- `.when()` **memaksa** semua state (`loading`, `error`, `data`) untuk
+  ditangani — tidak ada cabang yang terlewat seperti yang sering terjadi pada
+  boolean. Selain itu `AsyncValue` menyimpan error beserta *stack trace* dan
+  bisa mempertahankan data lama (`.copyWithPrevious()`) untuk pola
+  stale-while-revalidate.
+
+### Bagian mana dari hasil AI yang Anda perbaiki, dan mengapa?
+1. **Unit test timeout** — `defaultRetry` Riverpod me-retry `Exception` dengan
+   backoff, sehingga build yang selalu gagal nyangkut di `loading` dan test
+   timeout 30 detik. Perbaikan: `retry: (_, _) => null` pada container di
+   `test/stats_provider_test.dart` agar exception langsung menjadi `AsyncError`.
+2. **Test yang tidak deterministik** — menyuntikkan `Random`, `failureRate`, dan
+   `delay` (`_ScriptedRandom`) supaya hasil sukses/gagal tidak bergantung waktu
+   nyata dan angka acak.
+3. **Widget test gagal "Found 2 widgets"** — dialog masih dalam animasi penutup
+   saat assert, sehingga teks yang sama muncul dua kali. Perbaikan: `pump()`
+   menjadi `pumpAndSettle()` di `test/widget_test.dart:17` agar dialog benar-benar
+   selesai ditutup sebelum memeriksa isi layar.
+- Alasan utamanya: memastikan kode tetap **immutable**, `ref.watch` hanya dipakai
+  di dalam `build`, dan ketiga state AsyncValue benar-benar ditangani — sesuai
+  checklist verifikasi.
+
+
 # AI Prompt Challenge
 
 Buatkan halaman Flutter bernama StatsPage menggunakan flutter_riverpod.
@@ -249,6 +347,6 @@ PS D:\college\semester 5\PeMob\244107020122-mobile-course\03-week-3-navigation-s
 
 ![AI Challenge 2](screenshots/ai%20challange2.jpeg)
 
-![Setelah refactor 1](screenshots/after%20refactor.jpeg)
+![Setelah refactor 1](screenshots/tugas%20after%20refactor.jpeg)
 
-![Setelah refactor 2](screenshots/after%20refactor2.jpeg) 
+![Setelah refactor 2](screenshots/tugas%20after%20refactor2.jpeg) 

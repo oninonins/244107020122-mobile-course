@@ -75,6 +75,11 @@ Future<Object?> readPostsErrorOnce(ProviderContainer container) {
 }
 
 String friendlyErrorMessage(Object error) {
+  // TimeoutException dilempar oleh `Future.timeout` (dipakai di
+  // CommentRepository.fetchComments). Beda dari DioException.timeout.
+  if (error is TimeoutException) {
+    return 'Waktu permintaan habis (timeout). Periksa internet Anda lalu coba lagi.';
+  }
   if (error is DioException) {
     switch (error.type) {
       case DioExceptionType.connectionTimeout:

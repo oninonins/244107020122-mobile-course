@@ -50,3 +50,49 @@ Analyzing week4_api...
 No issues found! (ran in 8.7s)
 flutter test
 00:27 +4 -1: Some tests failed.
+
+
+
+Checklist verifikasi mandiri
+UI tidak memanggil Dio langsung, semua akses data lewat repository + provider.
+Semua halaman membaca via provider yang memakai repository:
+PagedPostPage → pagedPostsProvider → postRepository, PostDetailPage → postDetailProvider → fetchPost, PostListPage → postListProvider.
+
+Empat state tampil benar: loading, error (+ retry), empty, success.
+Hasil: Lulus.
+
+Loading: spinner centered di halaman list dan detail, serta indikator di footer daftar berpagina.
+Error + retry: pesan ramah `friendlyErrorMessage` dan tombol `Coba lagi` muncul saat daftar kosong.
+Empty: teks `Belum ada data dari server.` di halaman list, dan `Semua data termuat.` di daftar berpagina.
+Success: daftar PostTile dengan avatar id, judul, dan ringkasan isi.
+
+Pagination: data bertambah saat scroll, tidak ada request ganda, ada indikator akhir data.
+Hasil: Lulus.
+
+Data bertambah saat scroll: notifier menempelkan data baru ke daftar dan menaikkan nomor halaman.
+Tidak ada request ganda: guard `isLoadingMore` dan `!hasMore` menghentikan pemicuan ulang selama request berjalan.
+Indikator akhir: footer menampilkan `Semua data termuat.` ketika `hasMore` bernilai false.
+
+flutter analyze tanpa issue dan semua test lulus.
+
+flutter test  
+00:13 +8: D:/college/semester 5/PeMo
+flutter analyze
+Analyzing week4_api...                                                  
+No issues found! (ran in 7.7s)
+
+
+hasil refactor 
+
+![Hasil Refactor](screenshots/hasilRefactor.jpeg) 
+
+
+Refleksi
+Mengapa UI dilarang memanggil Dio langsung? Apa yang rusak jika aturan ini dilanggar?
+Agar UI tidak bergantung pada detail HTTP/API Jika dilanggar, logic networking tersebar di banyak widget, sulit dites
+Kapan pagination client-side cukup, dan kapan harus mengandalkan pagination server (_page/_limit)?
+Client-side cukup jika dataset kecil dan seluruh data aman/efisien dimuat sekaligus
+Bagaimana exception repository berubah menjadi AsyncError tanpa try/catch di setiap widget? Kapan try/catch eksplisit tetap dibutuhkan?
+Repository melempar exception, lalu Riverpod FutureProvider/AsyncNotifier menangkap kegagalan tersebut dan mengeksposnya sebagai AsyncError. try/catch di widget hanya diperlukan jika UI perlu menangani error secara khusus atau melakukan recovery tertentu.
+Bagian mana dari hasil AI yang Anda perbaiki, dan mengapa?
+tidak ada  

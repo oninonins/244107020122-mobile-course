@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'models/comment.dart';
+import 'network_errors.dart';
 import 'providers.dart';
 import 'repositories/comment_repository.dart';
 
@@ -58,8 +59,8 @@ final commentListProvider =
 );
 
 /// Pemetaan error menjadi pesan ramah pengguna.
-/// Logika lengkap dipinjam dari `friendlyErrorMessage` yang sudah ada
-/// di providers.dart (menangani timeout, connection error, 404, 500, DLL)
-/// sehingga tidak ada duplikasi antar repository.
+/// Logika lengkap dipinjam dari `friendlyErrorMessage` di `network_errors.dart`
+/// (menangani timeout, connection error, 404, 500, DLL) sehingga tidak ada
+/// duplikasi antar repository/halaman.
 String friendlyCommentErrorMessage(Object error) =>
     friendlyErrorMessage(error);

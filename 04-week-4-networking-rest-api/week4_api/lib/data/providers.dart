@@ -74,30 +74,19 @@ Future<Object?> readPostsErrorOnce(ProviderContainer container) {
   return completer.future.whenComplete(sub.close);
 }
 
-String friendlyErrorMessage(Object error) {
-  // TimeoutException dilempar oleh `Future.timeout` (dipakai di
-  // CommentRepository.fetchComments). Beda dari DioException.timeout.
-  if (error is TimeoutException) {
-    return 'Waktu permintaan habis (timeout). Periksa internet Anda lalu coba lagi.';
-  }
-  if (error is DioException) {
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return 'Koneksi lambat atau timeout. Periksa internet Anda lalu coba lagi.';
-      case DioExceptionType.connectionError:
-        return 'Tidak dapat terhubung ke server. Periksa internet Anda.';
-      case DioExceptionType.badResponse:
-        final code = error.response?.statusCode;
-        if (code == 404) return 'Data tidak ditemukan (404).';
-        if (code == 401 || code == 403) {
-          return 'Akses ditolak ($code). Periksa kredensial Anda.';
-        }
-        return 'Server bermasalah ($code). Coba lagi nanti.';
-      default:
-        return 'Terjadi kesalahan jaringan. Coba lagi.';
+/// Provider detail satu post (family berdasarkan id post).
+///
+/// Prioritas sumber data:
+///  1. Jika list post sudah dimuat (mis. dari halaman list), cari post
+///     dengan id yang sama di `postListProvider` lalu kembalikan tanpa HTTP.
+///  2. Jika tidak ditemukan / list belum dimuat (mis. halaman detail dibuka
+///     langsung lewat URL /deep link), ambil via repository (`/posts/:id`).
+final postDetailProvider = FutureProvider.family<Post, int>(
+  (ref, postId) async {
+    final posts = ref.watch(postListProvider).value;
+    for (final post in posts ?? const <Post>[]) {
+      if (post.id == postId) return post;
     }
-  }
-  return 'Terjadi kesalahan tak terduga: $error';
-}
+    return ref.watch(postRepositoryProvider).fetchPost(postId);
+  },
+);

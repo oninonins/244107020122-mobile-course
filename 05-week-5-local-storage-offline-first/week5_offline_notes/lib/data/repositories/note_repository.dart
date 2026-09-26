@@ -14,6 +14,20 @@ class NoteRepository {
     return rows.map(Note.fromMap).toList();
   }
 
+  /// Mengambil satu catatan berdasarkan id.
+  /// Mengembalikan null bila catatan dengan id tersebut belum ada.
+  Future<Note?> fetchNote(int id) async {
+    final db = await _openDb();
+    final rows = await db.query(
+      'notes',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return Note.fromMap(rows.first);
+  }
+
   Future<Note> addNote({required String title, String body = ''}) async {
     final db = await _openDb();
     final note = Note(

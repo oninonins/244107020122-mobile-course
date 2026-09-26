@@ -2,8 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client.dart';
+import 'local/note.dart';
 import 'models/post.dart';
-import 'posts_cache_first.dart';
 import 'repositories/cached_posts_repository.dart';
 import 'repositories/note_repository.dart';
 import 'repositories/posts_remote_repository.dart';
@@ -21,6 +21,43 @@ final cachedPostsRepositoryProvider = Provider<CachedPostsRepository>(
 
 final noteRepositoryProvider = Provider<NoteRepository>(
   (ref) => NoteRepository(),
+);
+
+/// Provider daftar catatan dari repository lokal.
+///
+/// Setiap perubahan (tambah/hapus) membangun ulang state via
+/// invalidateSelf sehingga daftar selalu mencerminkan isi database.
+final notesListProvider =
+    AsyncNotifierProvider<NotesListNotifier, List<Note>>(
+        NotesListNotifier.new,
+        // Nonaktifkan retry otomatis Riverpod 3 agar error langsung
+        // final dan mudah diuji (tanpa ini, future provider di-test
+        // akan me-retry dan menggantung).
+        retry: (retryCount, error) => null);
+
+class NotesListNotifier extends AsyncNotifier<List<Note>> {
+  @override
+  Future<List<Note>> build() =>
+      ref.watch(noteRepositoryProvider).fetchNotes();
+
+  Future<void> addNote({required String title}) async {
+    await ref.read(noteRepositoryProvider).addNote(title: title);
+    ref.invalidateSelf();
+  }
+
+  Future<void> deleteNote(int id) async {
+    await ref.read(noteRepositoryProvider).deleteNote(id);
+    ref.invalidateSelf();
+  }
+}
+
+/// Provider detail satu catatan.
+///
+/// Membaca langsung dari repository lokal via `fetchNote(id)`,
+/// bukan dari state halaman list, sehingga tahan terhadap
+/// invalidation dan cocok untuk navigasi langsung `/note/:id`.
+final noteDetailProvider = FutureProvider.family<Note?, int>(
+  (ref, id) => ref.watch(noteRepositoryProvider).fetchNote(id),
 );
 
 /// Provider cache-first untuk daftar posts.

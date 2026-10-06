@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../routes.dart';
+
 class AnnouncementPage extends StatelessWidget {
   const AnnouncementPage({super.key, required this.id});
 
@@ -25,7 +27,7 @@ class AnnouncementPage extends StatelessWidget {
             const Spacer(),
             Text(
               'Halaman ini dibuka dari deep link notifikasi '
-              '(data.route = /pengumuman/$id).',
+              '(data.route = ${Routes.announcementDetail(id)}).',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

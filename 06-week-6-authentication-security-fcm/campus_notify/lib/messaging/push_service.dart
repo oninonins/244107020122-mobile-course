@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../data/api_errors.dart';
 import '../data/auth_repository.dart';
+import '../routes.dart';
 
 final _local = FlutterLocalNotificationsPlugin();
 
@@ -47,6 +48,21 @@ void _emitDeepLink(String route) {
 /// [registerDevice] tidak perlu memanggil `getToken()` berulang kali.
 String? _cachedToken;
 
+/// Momen token terakhir diterima, dipakai debug card untuk membuktikan bahwa
+/// `onTokenRefresh` benar-benar terpanggil.
+DateTime? _tokenUpdatedAt;
+
+DateTime? get tokenUpdatedAt => _tokenUpdatedAt;
+
+/// Token tidak pernah ditampilkan penuh, hanya 12 karakter pertama.
+String maskedToken() => maskToken(_cachedToken);
+
+/// Emit setiap token baru (pertama maupun hasil refresh) supaya debug card
+/// ikut berubah seketika tanpa harus mem-polling.
+final _tokenController = StreamController<String>.broadcast();
+
+Stream<String> get tokenStream => _tokenController.stream;
+
 /// Handler background wajib fungsi top-level dengan `@pragma('vm:entry-point')`
 /// karena berjalan di isolate terpisah. Di sini tidak boleh menyentuh
 /// BuildContext maupun Riverpod; navigasi baru dilakukan setelah aplikasi
@@ -63,8 +79,16 @@ void registerBackgroundHandler() {
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 }
 
+/// Menyimpan token baru beserta waktu penerimaannya, lalu menyiarkannya ke
+/// pendengar [tokenStream].
+void _cacheToken(String token) {
+  _cachedToken = token;
+  _tokenUpdatedAt = DateTime.now();
+  if (_tokenController.isClosed) return;
+  _tokenController.add(token);
+}
+
 /// Minta izin notifikasi runtime.
-///
 /// Android 13+ dan iOS wajib meminta izin secara eksplisit. Perhatikan bahwa
 /// `FirebaseMessaging.instance.requestPermission()` hanya benar-benar
 /// menampilkan dialog di iOS/macOS; di Android dialognya diambil lewat plugin
@@ -127,12 +151,12 @@ Future<void> initFcmToken({
 }) async {
   final token = await FirebaseMessaging.instance.getToken();
   if (token != null) {
-    _cachedToken = token;
+    _cacheToken(token);
     await onToken(token);
   }
 
   FirebaseMessaging.instance.onTokenRefresh.listen((fresh) {
-    _cachedToken = fresh;
+    _cacheToken(fresh);
     unawaited(onToken(fresh));
   });
 
@@ -248,18 +272,9 @@ Future<void> simulateNotification({String route = '/pengumuman/3'}) {
   );
 }
 
-/// Membaca `data.route` dari payload FCM menjadi rute GoRouter yang valid.
-String routeFromMessage(Map<String, dynamic> data) {
-  final route = data['route'] as String? ?? '/';
-  return route.startsWith('/') ? route : '/$route';
-}
-
 /// Menangani kasus terminated: aplikasi dibuka dari notifikasi. Panggil
 /// setelah router siap.
 Future<void> handleTerminated() async {
   final initial = await FirebaseMessaging.instance.getInitialMessage();
   if (initial != null) _emitDeepLink(routeFromMessage(initial.data));
 }
-
-/// Token hanya ditampilkan 12 karakter pertama, tidak pernah penuh.
-String maskedToken() => maskToken(_cachedToken);

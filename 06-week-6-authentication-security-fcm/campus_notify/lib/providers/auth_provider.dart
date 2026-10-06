@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/api_client.dart';
 import '../data/auth_repository.dart';
 import '../data/token_store.dart';
+import '../messaging/push_service.dart';
 
 /// Di-override di test dengan [InMemoryTokenStore].
 final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());
@@ -49,7 +52,16 @@ class AuthNotifier extends AsyncNotifier<bool> {
           .save(access: session.access, refresh: session.refresh);
       return true;
     });
-    return state.hasValue && state.value == true;
+
+    final loggedIn = state.hasValue && state.value == true;
+    if (loggedIn) {
+      // Token FCM didaftarkan ulang ke backend sekarang juga, karena
+      // `POST /devices` baru boleh berjalan setelah access token tersimpan.
+      // Jalur ini menutup celah: token yang diambil saat app start dikirim
+      // lagi dengan header `Authorization` yang sah.
+      unawaited(registerDevice(ref.read(apiClientProvider)));
+    }
+    return loggedIn;
   }
 
   Future<void> logout() async {

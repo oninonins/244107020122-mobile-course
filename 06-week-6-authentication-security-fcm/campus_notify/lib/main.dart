@@ -10,6 +10,7 @@ import 'pages/announcement_page.dart';
 import 'pages/home_page.dart';
 import 'pages/login_page.dart';
 import 'providers/auth_provider.dart';
+import 'routes.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,20 +47,20 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 
   final router = GoRouter(
-    initialLocation: '/',
+    initialLocation: Routes.home,
     refreshListenable: refresh,
     redirect: (context, state) {
       final loggedIn = ref.read(authStateProvider).value ?? false;
-      final goingLogin = state.matchedLocation == '/login';
-      if (!loggedIn && !goingLogin) return '/login';
-      if (loggedIn && goingLogin) return '/';
+      final goingLogin = state.matchedLocation == Routes.login;
+      if (!loggedIn && !goingLogin) return Routes.login;
+      if (loggedIn && goingLogin) return Routes.home;
       return null;
     },
     routes: [
-      GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
-      GoRoute(path: '/', builder: (_, _) => const HomePage()),
+      GoRoute(path: Routes.login, builder: (_, _) => const LoginPage()),
+      GoRoute(path: Routes.home, builder: (_, _) => const HomePage()),
       GoRoute(
-        path: '/pengumuman/:id',
+        path: Routes.announcementPattern,
         builder: (_, state) =>
             AnnouncementPage(id: state.pathParameters['id'] ?? ''),
       ),
@@ -102,20 +103,38 @@ class _CampusNotifyAppState extends ConsumerState<CampusNotifyApp> {
     // `handleTerminated` berjalan tidak hilang.
     _deepLinkSub = deepLinkStream.listen(_go);
 
-    // Kasus terminated: aplikasi dibuka dari notifikasi.
-    //
-    // Harus dipanggil SEBELUM `initFcmToken` karena `getToken()` menunggu
-    // jaringan. Kalau ditunda, navigasi ke deep link tertahan sampai token
-    // selesai diambil, dan gagal total saat jaringan sedang buruk.
-    await handleTerminated();
+    // Kegagalan messaging tidak boleh menjatuhkan aplikasi: di unit test
+    // plugin Firebase memang tidak terdaftar, dan di produksi konfigurasi
+    // yang salah harus tetap bisa membuka login.
+    try {
+      // Kasus terminated: aplikasi dibuka dari notifikasi.
+      //
+      // Harus dipanggil SEBELUM `initFcmToken` karena `getToken()` menunggu
+      // jaringan. Kalau ditunda, navigasi deep link tertahan sampai token
+      // selesai diambil, dan gagal total saat jaringan buruk.
+      await handleTerminated();
 
-    await initLocalNotifications();
-    listenForeground();
+      await initLocalNotifications();
+      listenForeground();
 
-    // Token diambil lalu dikirim ke backend lewat `onToken`. Endpoint
-    // `POST /devices` dipanggil dari debug card di HomePage supaya
-    // kegagalannya bisa diamati.
-    await initFcmToken(onToken: (_) async {});
+      // Token diambil lalu dikirim ke backend lewat `onToken`. Dipanggil lagi
+      // setelah login berhasil supaya POST /devices selalu memakai header
+      // `Authorization`.
+      await initFcmToken(onToken: _registerDevice);
+    } on Object catch (error) {
+      debugPrint('[messaging] inisialisasi gagal: $error');
+    }
+  }
+
+  /// Mendaftarkan token ke backend lewat `POST /devices`.
+  ///
+  /// Kalau sesi belum ada, token TIDAK dikirim di sini: [\AuthNotifier.login]
+  /// mendaftarkannya ulang setelah access token tersimpan. Tanpa itu, POST
+  /// berjalan tanpa header `Authorization` dan ditolak backend.
+  Future<void> _registerDevice(String _) async {
+    final loggedIn = await ref.read(authStateProvider.future);
+    if (!loggedIn) return;
+    await registerDevice(ref.read(apiClientProvider));
   }
 
   void _go(String route) {

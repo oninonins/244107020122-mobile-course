@@ -87,7 +87,17 @@ Screenshot lain:
 | `screenshots/loginPage.jpeg` | Halaman login |
 | `screenshots/dasboard.jpeg` | Dashboard, kartu debug token terpotong |
 | `screenshots/fcm-console-test.jpeg` | Pengiriman dari Firebase Console |
-| `screenshots/fcm-console-test2.jpeg` | setelah menekan notifikasi |
+| `screenshots/fcm-console-test2.jpeg` | Setelah menekan notifikasi |
+| `screenshots/after-refactor.jpeg` | Kartu Debug FCM setelah refactoring |
+
+### Tampilan Setelah Refactoring
+
+Kartu **Debug FCM** menampilkan token perangkat dalam bentuk terpotong
+beserta waktu terakhir token diperbarui. Bagian jam tersebut yang membuktikan
+`onTokenRefresh` benar-benar terpanggil: kalau listener tidak aktif, kolom itu
+tidak akan pernah berubah meski token sudah berganti.
+
+![Kartu debug FCM setelah refactoring](screenshots/after-refactor.jpeg)
 
 ## Topik vs Token Perangkat
 
@@ -95,6 +105,16 @@ Screenshot lain:
   Aturan: nama tanpa spasi, semua penerima berada di channel yang sama.
 - **Token perangkat** untuk pesan personal: nilai akademik, tagihan, absensi.
   Jangan pernah mengirim tagihan ke topik karena akan terlihat semua mahasiswa.
+
+## Checklist Verifikasi Mandiri
+
+| Item | Status | Bukti |
+|---|---|---|
+| Token hanya di `flutter_secure_storage`, tidak di SharedPreferences/log/screenshot penuh | ✅ | `SecureTokenStore` (Keychain/Keystore). `SharedPreferences` tidak dipakai sama sekali. `debugPrint` hanya mencetak `route` dan `title`, tidak pernah token |
+| 401 memicu refresh sekali lalu retry; refresh mati memaksa login ulang | ✅ | Interceptor Dio memakai penanda `auth_retried` supaya request tidak diulang dua kali. Refresh ditolak → secure storage dikosongkan → guard route ke `/login` |
+| Ketiga app state teruji dengan tabel bukti; klik masuk ke rute yang benar | ✅ | Diuji manual di perangkat, lihat tabel matriks di atas dan screenshot di `screenshots/` |
+| Topik untuk broadcast, token untuk pesan personal | ✅ | Toggle subscribe/unsubscribe `pengumuman-kampus` di debug card, dengan catatan perbedaan fungsi topik dan token |
+| `flutter analyze` bersih dan semua test lulus | ✅ | `No issues found!` dan `All tests passed!` — 10 test (`test/auth_push_test.dart` + `test/widget_test.dart`) |
 
 ## Catatan Teknis
 
@@ -141,7 +161,7 @@ terimplementasi di `campus_notify/lib/messaging/push_service.dart`.
 | Checklist | Status | Bukti |
 |---|---|---|
 | Background handler **fungsi top-level** dengan `@pragma('vm:entry-point')`, bukan method kelas | ✅ | `push_service.dart:54` |
-| `onTokenRefresh` benar-benar **mengirim** token baru ke backend, bukan hanya dicetak ke log | ⚠️ **belum** | listener ada dan token tersimpan, tapi belum memanggil `POST /devices` — masih manual dari debug card |
+| `onTokenRefresh` benar-benar **mengirim** token baru ke backend, bukan hanya dicetak ke log | ✅ | `initFcmToken(onToken: _registerDevice)` di `main.dart`, lalu `AuthNotifier.login()` mendaftarkan ulang token setelah access token tersimpan |
 | Foreground memakai local notification **manual** | ✅ | `push_service.dart:199` → `showNotification()` |
 | Klik dari ketiga state masuk ke rute yang benar | ✅ | `routeFromMessage()` + `deepLinkStream` |
 | Token/secret tidak di-hardcode dan tidak di-log penuh | ✅ | `maskedToken()` hanya 12 karakter |
@@ -212,10 +232,18 @@ Tugasnya hanya mencatat. Navigasi dilakukan setelah aplikasi dibuka, melalui
 
 ### Keputusan akhir
 
-- **`POST /devices` tetap dipanggil dari debug card** sementara, bukan otomatis,
-  karena belum ada backend sungguhan. Endpoint `example-campus-api.test` pasti
-  gagal dan kegagalannya justru dipakai sebagai bukti bahwa alur token benar
+- **`POST /devices` dipanggil otomatis setelah login, bukan manual.** Token
+  yang diambil saat app start hanya dikirim kalau sesi sudah ada
+  (`await ref.read(authStateProvider.future)` di `_registerDevice`), lalu
+  didaftarkan ulang oleh `AuthNotifier.login()` setelah access token
+  tersimpan. Alasannya: request tanpa header `Authorization` akan ditolak
+  backend, dan `onTokenRefresh` tidak akan memicu ulang sampai token benar-benar
+  berubah. Endpoint `example-campus-api.test` memang belum ada, jadi
+  kegagalannya ditampilkan di debug card sebagai bukti alur token benar-benar
   memanggil jaringan.
+- **Waktu token terakhir diperbarui ditampilkan di debug card** supaya
+  `onTokenRefresh` bisa dibuktikan secara visual, sesuai permintaan codelab
+  untuk menunjukkan bahwa token berubah setelah reinstall atau clear data.
 - **Status topik dilacak lokal.** `firebase_messaging` 16.7.0 hanya punya
   `subscribeToTopic` dan `unsubscribeFromTopic` tanpa API untuk menanyakan
   status, jadi state disimpan manual dari panggilan terakhir.

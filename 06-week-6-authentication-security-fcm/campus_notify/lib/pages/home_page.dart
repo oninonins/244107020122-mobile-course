@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../data/auth_repository.dart';
 import '../messaging/push_service.dart';
 import '../providers/auth_provider.dart';
+import '../routes.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -19,14 +22,38 @@ class _HomePageState extends ConsumerState<HomePage> {
   String? _email;
   String? _permissionStatus;
   String? _fcmToken;
+  String? _tokenUpdatedAt;
   String? _deviceStatus;
   bool _topicSubscribed = false;
+  StreamSubscription<String>? _tokenSub;
 
   @override
   void initState() {
     super.initState();
     _loadDebugTokens();
     _loadFcmToken();
+
+    // Dengarkan token baru supaya kartu debug ikut berubah saat
+    // `onTokenRefresh` berjalan, bukan hanya saat halaman dibuka.
+    _tokenSub = tokenStream.listen((token) {
+      if (!mounted) return;
+      setState(() {
+        _fcmToken = maskToken(token);
+        _tokenUpdatedAt = _formatTime(tokenUpdatedAt);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _tokenSub?.cancel();
+    super.dispose();
+  }
+
+  static String _formatTime(DateTime? time) {
+    if (time == null) return '-';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
   }
 
   Future<void> _loadDebugTokens() async {
@@ -48,6 +75,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (!mounted) return;
     setState(() {
       _fcmToken = token;
+      _tokenUpdatedAt = _formatTime(tokenUpdatedAt);
       _topicSubscribed = isSubscribedToCampusTopic;
     });
   }
@@ -157,6 +185,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   const SizedBox(height: 12),
                   _TokenRow(label: 'Token', value: _fcmToken),
+                  _TokenRow(label: 'Diperbarui', value: _tokenUpdatedAt),
                   if (_permissionStatus != null)
                     _TokenRow(label: 'Izin', value: _permissionStatus),
                   if (_deviceStatus != null)
@@ -223,7 +252,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 'Halaman tujuan deep link notifikasi (dari FCM).',
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/pengumuman/3'),
+              onTap: () => context.push(Routes.announcementDetail('3')),
             ),
           ),
         ],

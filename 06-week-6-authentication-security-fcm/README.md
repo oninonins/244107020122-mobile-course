@@ -1,4 +1,4 @@
-# Week 6 — Authentication, Security & FCM
+﻿# Week 6 — Authentication, Security & FCM
 
 Campus Notify: aplikasi notifikasi pengumuman kampus dengan login terlindungi,
 penyimpanan token aman, dan Firebase Cloud Messaging.
@@ -251,3 +251,146 @@ Tugasnya hanya mencatat. Navigasi dilakukan setelah aplikasi dibuka, melalui
   itu untuk Android native. Di Flutter, versi SDK sudah dibawa plugin
   `firebase_core`/`firebase_messaging`; menambahkannya manual berisiko
   konflik versi.
+
+## Refleksi
+
+### Mengapa refresh token tidak boleh disimpan di SharedPreferences? Apa risikonya bila bocor?
+
+Refresh token adalah tiket berumur panjang untuk meminta access token baru
+tanpa pengguna login ulang. Artinya, siapa pun yang memilikinya bisa Trader
+berp Allowing identitas pengguna tersebut — bukan hanya membaca data, tapi
+menjadi pemilik sesi.
+
+SharedPreferences tidak aman untuk ini karena **disimpan sebagai teks biasa di
+disk tanpa enkripsi**. Di Android, file preferensi berada di direktori data
+aplikasi yang sebenarnya dilindungi sandbox, tapiperlindungan itu hilang di
+skenario yang sangat umum:
+
+- Perangkat sudah di-*root*, atau
+- Aplikasi dibuka lewat ADB backup, atau
+- APK dialoguesnya di-*decompile* dan file preferensi ikut diambil, atau
+- Ada library sisi ketiga yang salah Handling membaca seluruh data aplikasi
+
+Begitu refresh token bocor, penyerang bisa-/**refresh berkali-kali** sampai
+token itu dicabut server. Tidak ada batasannya seperti access token yang hanya
+berumur 15 menit. Sementara itu `flutter_secure_storage` menyimpan nilainya di
+Android Keystore dan iOS Keychain, dengan dukungan enkripsi hardware dan
+tingkat kepercayaan yang tidak bisa ditembus oleh proses lain di perangkat
+yang sama.
+
+Yang lebih penting: **refresh token tidak boleh dicetak ke log, ditampilkan
+penuh di debug screen, atau difoto untuk laporan.**aksara debugging kerap
+menjadi kebocoran karena tidak dianggap sebagai data sensitif.
+
+### Apa yang rusak bila `onTokenRefresh` diabaikan selama satu semester perkuliahan?
+
+Token perangkat FCM tidak pernah benar-benar statis. Ia berubah karena
+beberapa hal yang dalam satu semester pasti terjadi:
+
+| Penyebab | Kapan terjadi |
+|---|---|
+| Clear data aplikasi / uninstall lalu install ulang | Rutin saat troubleshoot |
+| Rotasi key keamanan atau pergantian akun Google di perangkat | Saat pengguna ganti akun |
+| Pemulihan dari backup ke perangkat baru | Saat ganti HP |
+| Kadaluarsa token internal FCM | Tanpa bisa diprediksi |
+
+Kalau `onTokenRefresh` diabaikan, akibatnya **bukan** notifikasi yang telat
+sampai — tapi notifikasi yang **tidak sampai sama sekali**.
+
+Backend menyimpan token yang sudah mati. Setiap pengumuman yang dikirim ke
+token itu hilang tanpa jejak: tidak ada error di sisi server (permintaan
+terkirim, penerima nol), tidak ada feedback di sisi aplikasi (pengguna tidak
+tahu dia adalah salah satu yang dituju). Gejala yang paling menyebalkan
+adalah "kenapa orang lain dapat pengumuman tapi aku tidak?" — dan itu bukan
+bug yang terlihat di log manapun.
+
+Contoh nyata di kelas: banyak mahasiswa yang menghapus data aplikasi karena
+penyimpanan penuh. Token perangkat mereka berganti, tapi server masih
+menyimpan yang lama. Semua pengumuman untuk mereka hilang, dan mereka
+menganggap aplikasinya rusak.
+
+Yang membuat hal ini senyap adalah `getToken()` **tetap mengembalikan nilai** — token yang valid, yang hanya tidak lagi milik perangkat itu. Jadi tidak ada error yang memunculkan diri sendiri. Kegagalan baru terdeteksi kalau backend secara berkala merekam waktu token terakhir di-update per pengguna, lalu membandingkannya dengan waktu kiriman terakhir. Tanpa itu, token basi baru ketahuan setelah berbulan-bulan.
+
+### Kapan memakai topik dan kapan memakai token perangkat?
+
+Kriterianya satu: **apakah pesannya boleh dibaca orang lain?**
+
+| | Topik (`pengumuman-kampus`) | Token perangkat |
+|---|---|---|
+| Penerima | Semua yang berlangganan | Satu orang tertentu |
+| Pesan yang cocok | Broadcast umum | Pribadi / sensitif |
+| Onboarding | Automatis, cukup `subscribeToTopic` | Butuh token tersimpan di server |
+
+Contoh pesan kampus untuk masing-masing:
+
+**Pakai topik — pengumuman yang relevan untuk semua mahasiswa:**
+
+- "Jadwal UTS sudah diumumkan, cek portal akademik."
+- "Kuliah Mobile Publishing dipindah ke Ruang A2, Kamis 13.00."
+- "Seminar AI Ethics dibuka untuk seluruh mahasiswa, pendaftaran lewat portal."
+- "Perpustakaan tutup 28–30 Oktober karena hari libur."
+
+Semuanya bernilai sama bagi semua orang, jadi tidak ada alasan untuk
+mengirimnya per satu demi satu.
+
+**Pakai token perangkat — yang hanya boleh sampai ke satu orang:**
+
+- "Nilai UAS Anda: 87. Jangan dibagikan ke teman sekelas."
+- "Tagihan SPP semester ini belum lunas, jatuh tempo 5 November."
+- "Presensi Anda minggu ini 3 dari 4 pertemuan."
+- "Ada Feedback dari Dosen untuk tugas individu Anda."
+
+Aturan yang bisa diingat: **topik untuk pengumuman, token untuk tagihan.**
+Kalau ragu, tanya "apakah orang berikutnya akan menyalahi saya kalau pesan ini
+diterimanya?" Kalau ya, itu tidak boleh lewat topik.
+
+### Bagian mana dari draf AI yang ditolak atau diperbaiki, dan mengapa?
+
+Ada beberapa bagian yang saya ubah sendiri, bukan diterima apa adanya.
+
+**1. Menolak menambahkan Firebase BoM di level aplikasi.** Dokumentasi setup
+Firebase merekomendasikan
+`implementation(platform("com.google.firebase:firebase-bom"))` plus
+`implementation("com.google.firebase:firebase-analytics")` di
+`build.gradle.kts`. Pola itu ditulis untuk Android **native**. Di Flutter,
+paket `firebase_core` dan `firebase_messaging` sudah mendeklarasikan dependensi
+Firebase Android SDK-nya sendiri di build.gradle masing-masing plugin. Menambah
+BoM manual berisiko menyebabkan konflik versi antar artifact — `firebase-common`
+yang dibawa analytics versus yang dibawa messaging — dan gejalanya (build gagal
+dengan pesan versi tidak kompatibel) sulit dilacak. Saya cukup mendaftarkan
+plug-in `google-services`, dan FCM tetap berjalan.
+
+**2. Tidak menerima kode contoh codelab apa adanya.** Contoh `initFcmToken()` di
+codelab tampak sudah benar, tapi kalau detailnya ditelusuri, ada dua masalah
+nyata yang tidak akan terlihat dari membaca kode:
+
+- `getInitialMessage()` tidak ada di sana, padahal hanya itu yang menangani
+  kasus aplikasi dibuka dari notifikasi saat dalam keadaan terminated.
+- `onMessageOpenedApp` disambungkan langsung ke router, padahal saat itu
+  router belum tentu siap.
+
+Yang saya lakukan adalah memisahkan concerns: navigasi diserahkan lewat
+`deepLinkStream`, dan `getInitialMessage()` dipanggil **sebelum** `getToken()`.
+Urutan ini penting — `getToken()` menunggu jaringan, sehingga jika deep link
+diproses belakangan, navigasi tertahan sampai koneksi selesai atau gagal
+total saat jaringan buruk.
+
+**3. Menolak struktur file contoh test.** Contoh `auth_push_test.dart` di
+codelab mendefinisikan ulang `routeFromMessage` **di dalam file test** dan
+tidak meng-*import* apa pun dari `lib/`. Konsekuensinya, test itu akan tetap
+lulus walau `lib/routes.dart` dihapus — yang diuji adalah salinan di dalam
+test, bukan aplikasi. Saya mempertahankan nama test sesuai contoh, tapi
+meng-*import* fungsi asli dari `lib/routes.dart` supaya benar-benar menguji
+kode yang dipakai FCM. Test seperti ini sempat menangkap bug nyata: sebelum
+diperbaiki, `routeFromMessage({'route': 'pengumuman/3'})` mengembalikan string
+literal `"Routes.homepengumuman/3"` karena interpolasi salah, dan test versi
+contoh codelab tidak akan pernah menangkapnya.
+
+**4. Menolak `POST /devices` dipanggil manual dari tombol debug.** Versi
+sementara saya memanggil endpoint dari debug card supaya kegagalannya bisa
+diamati. Itu sesuai untuk MVP, tetapi menyisakan celah nyata: token yang
+diambil saat aplikasi start dikirim **tanpa** header `Authorization`, dan
+karena `onTokenRefresh` hanya memicu saat token benar-benar berubah, token itu
+tidak akan pernah dikirim ulang dengan otentikasi yang sah. Saya pindahkan
+panggilan ke jalur otomatis: token hanya dikirim bila sesi sudah ada, lalu
+`AuthNotifier.login()` mendaftarkannya ulang setelah access token tersimpan.

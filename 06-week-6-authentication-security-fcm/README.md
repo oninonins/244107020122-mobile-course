@@ -114,3 +114,112 @@ Screenshot lain:
 - **`flutter_local_notifications` 22.x** memakai named parameter
   (`initialize(settings: ...)`, `show(id: ...)`), berbeda dari versi lama yang
   memakai parameter posisional.
+
+## AI Challenge
+
+### Prompt yang diberikan
+
+```text
+Aplikasi Flutter Campus Notification App.
+Stack: firebase_messaging, flutter_local_notifications,
+flutter_secure_storage, go_router, Riverpod.
+Buatkan PushService dengan:
+- requestPermission + getToken + onTokenRefresh (kirim ke POST /devices)
+- onMessage (tampilkan local notification manual)
+- onMessageOpenedApp + getInitialMessage (navigasi ke data.route)
+- subscribe/unsubscribe topic pengumuman-kampus
+- background handler top-level dengan @pragma('vm:entry-point')
+Tandai bagian yang BERBEDA untuk Android 13+ vs iOS,
+dan bagian yang tidak boleh mengakses BuildContext.
+```
+
+### Hasil verifikasi checklist
+
+Checklist diambil dari codelab, lalu dicocokkan dengan kode yang benar-benar
+terimplementasi di `campus_notify/lib/messaging/push_service.dart`.
+
+| Checklist | Status | Bukti |
+|---|---|---|
+| Background handler **fungsi top-level** dengan `@pragma('vm:entry-point')`, bukan method kelas | ✅ | `push_service.dart:54` |
+| `onTokenRefresh` benar-benar **mengirim** token baru ke backend, bukan hanya dicetak ke log | ⚠️ **belum** | listener ada dan token tersimpan, tapi belum memanggil `POST /devices` — masih manual dari debug card |
+| Foreground memakai local notification **manual** | ✅ | `push_service.dart:199` → `showNotification()` |
+| Klik dari ketiga state masuk ke rute yang benar | ✅ | `routeFromMessage()` + `deepLinkStream` |
+| Token/secret tidak di-hardcode dan tidak di-log penuh | ✅ | `maskedToken()` hanya 12 karakter |
+| Bagian Android 13+ vs iOS ditandai jelas | ✅ | `requestNotificationPermission()` |
+
+### Bagian yang berbeda: Android 13+ vs iOS
+
+```dart
+Future<bool> requestNotificationPermission() async {
+  // ANDROID 13+ (API 33): dialog izin diambil dari plugin local
+  // notifications, BUKAN dari Firebase. Firebase hanya memunculkan dialog
+  // di iOS/macOS. Kalau salah, notifikasi tidak pernah tampil dan sulit
+  // didiagnosis.
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    final android = _local.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    return await android?.requestNotificationsPermission() ?? false;
+  }
+
+  // iOS / macOS: hanya di sini Firebase yang menangani dialog izin.
+  final settings = await FirebaseMessaging.instance.requestPermission(
+    alert: true, badge: true, sound: true,
+    announcement: false, carPlay: false, criticalAlert: false,
+  );
+  return settings.authorizationStatus == AuthorizationStatus.authorized ||
+      settings.authorizationStatus == AuthorizationStatus.provisional;
+}
+```
+
+Perbedaan lain:
+
+| Aspek | Android | iOS |
+|---|---|---|
+| Dialog izin runtime | Plugin local notifications | `FirebaseMessaging.instance.requestPermission()` |
+| `@mipmap/ic_launcher` sebagai ikon | `AndroidInitializationSettings` | Tidak dipakai, iOS memakai `DarwinInitializationSettings()` |
+| Channel notifikasi | Wajib (`createNotificationChannel`) | Tidak ada konsep channel |
+
+### Bagian yang tidak boleh mengakses `BuildContext`
+
+```dart
+// WAJIB top-level + @pragma('vm:entry-point').
+// Jangan pernah menambah BuildContext, ref Riverpod, atau navigasi di sini.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  debugPrint('[FCM background] route=${message.data['route']}');
+}
+```
+
+Alasannya: handler ini berjalan di **isolate terpisah** yang di-*spin up* oleh
+engine ketika pesan tiba, terpisah dari isolate UI. `BuildContext`, `ref`
+Riverpod, dan router tidak ada di sana — menyentuh salah satunya akan crash
+dengan `Null check operator used on a null value` atau `ProviderNotFound`.
+
+Tugasnya hanya mencatat. Navigasi dilakukan setelah aplikasi dibuka, melalui
+`getInitialMessage()` atau `onMessageOpenedApp()`.
+
+### Perbaikan manual terhadap draf awal
+
+| Masalah | Gejala | Perbaikan |
+|---|---|---|
+| `flutter_local_notifications` 22.x breaking change | Kode codelab tidak bisa dikompilasi | Pakai named parameter: `initialize(settings: ...)` dan `show(id:, title:, ...)` |
+| Izin notifikasi Android tidak muncul | Banner tidak pernah tampil saat diuji | Dialog Android diambil dari plugin local notifications, bukan dari Firebase |
+| `getInitialMessage()` dipanggil paling akhir | Deep link tertahan sampai `getToken()` selesai | Dipindah sebelum `initFcmToken()` supaya tidak menunggu jaringan |
+| `ref.listen` dipanggil dari `initState()` | Crash: *"ref.listen can only be used within the build method of a ConsumerWidget"* | Router dipindah ke `Provider`, memakai `Ref.listen` provider yang tidak punya guard tersebut |
+| Refresh token diulang tanpa batas | Endpoint 401 loop | Penanda `auth_retried` pada `RequestOptions.extra` |
+| `TokenStore` tidak bisa di-fake untuk test | `InMemoryTokenStore` gagal di-*implement* | `TokenStore` dipecah jadi `abstract interface class` + dua implementasi |
+| Kotlin incremental cache gagal | *"this and base files have different roots"* (pub cache di `C:`, project di `D:`) | `kotlin.incremental=false` di `android/gradle.properties` |
+
+### Keputusan akhir
+
+- **`POST /devices` tetap dipanggil dari debug card** sementara, bukan otomatis,
+  karena belum ada backend sungguhan. Endpoint `example-campus-api.test` pasti
+  gagal dan kegagalannya justru dipakai sebagai bukti bahwa alur token benar
+  memanggil jaringan.
+- **Status topik dilacak lokal.** `firebase_messaging` 16.7.0 hanya punya
+  `subscribeToTopic` dan `unsubscribeFromTopic` tanpa API untuk menanyakan
+  status, jadi state disimpan manual dari panggilan terakhir.
+- **Firebase BoM tidak ditambahkan.** Pola `firebase-bom` + `implementation(...)`
+  itu untuk Android native. Di Flutter, versi SDK sudah dibawa plugin
+  `firebase_core`/`firebase_messaging`; menambahkannya manual berisiko
+  konflik versi.

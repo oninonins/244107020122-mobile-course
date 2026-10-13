@@ -214,6 +214,128 @@ flutter analyze   -> No issues found!
 flutter test      -> All tests passed! (10 test)
 ```
 
+## Praktikum 3 — Struktur Target
+
+Feature-first: satu fitur = satu folder vertikal berisi `domain`, `data`, dan
+`presentation`. Dipilih karena `campus_notify` punya tiga fitur yang saling
+bebas, dan menghapus satu fitur berarti menghapus satu folder tanpa menyentuh
+yang lain.
+
+```
+campus_notify/lib/
+├── core/
+│   ├── failures.dart            # sealed Failure + subtype (murni Dart, nol import)
+│   └── format.dart              # maskToken, formatClock, emailFromRefresh (murni Dart)
+├── features/
+│   ├── auth/
+│   │   ├── domain/                       # TIDAK boleh import Flutter/Dio/FlutterSecureStorage
+│   │   │   ├── entities/
+│   │   │   │   └── auth_session.dart              # entity murni: access + refresh
+│   │   │   ├── repositories/
+│   │   │   │   ├── auth_repository.dart           # interface (+ record return)
+│   │   │   │   └── token_store.dart               # interface
+│   │   │   └── usecases/
+│   │   │       └── login.dart                     # validasi + orkestrasi
+│   │   ├── data/
+│   │   │   ├── models/
+│   │   │   │   └── auth_session_model.dart         # mapping JSON di sini saja
+│   │   │   ├── datasources/
+│   │   │   │   └── secure_token_store.dart         # + InMemoryTokenStore
+│   │   │   └── repositories/
+│   │   │       └── mock_auth_repository.dart
+│   │   └── presentation/
+│   │       ├── providers/
+│   │       │   └── auth_providers.dart             # satu-satunya tempat wiring DI
+│   │       └── pages/
+│   │           └── login_page.dart
+│   ├── announcements/
+│   │   ├── domain/
+│   │   │   ├── entities/announcement.dart
+│   │   │   ├── repositories/announcement_repository.dart
+│   │   │   └── usecases/{get_announcements,get_announcement}.dart
+│   │   ├── data/
+│   │   │   ├── models/announcement_model.dart
+│   │   │   └── repositories/mock_announcement_repository.dart
+│   │   └── presentation/
+│   │       ├── providers/announcement_providers.dart
+│   │       └── pages/{home_page,announcement_page}.dart
+│   └── notifications/
+│       ├── domain/
+│       │   ├── repositories/push_repositories.dart  # 4 interface kecil (ISP)
+│       │   └── usecases/{register_device,set_topic_subscription,request_permission}.dart
+│       ├── data/
+│       │   ├── firebase_push_repository.dart         # + registerBackgroundHandler()
+│       │   ├── dio_device_registrar.dart            # POST /devices
+│       │   ├── api_client.dart                      # Dio + interceptor refresh
+│       │   └── api_errors.dart
+│       └── presentation/
+│           └── providers/push_providers.dart
+├── routes.dart                            # konstanta rute + routeFromMessage + routerProvider
+└── main.dart                              # composition root
+```
+
+### Yang sudah dibuat pada Praktikum 3
+
+| File | Isi | Status |
+|---|---|---|
+| `core/failures.dart` | `sealed class Failure` + `LocalFailure`, `NetworkFailure`, `AuthFailure`, `ValidationFailure` | ✅ selesai |
+| `core/format.dart` | `maskToken`, `formatClock`, `formatDate`, `emailFromRefresh` | ✅ selesai |
+
+Keduanya sudah diverifikasi steril dan bisa langsung dipakai lapisan berikutnya.
+
+```
+rg "import 'package:flutter|import 'package:dio|import 'package:sqflite|import 'package:firebase" lib/core
+(exit=1 → nol hasil, bersih)
+rg "^import" lib/core
+(exit=1 → nol hasil, tidak ada satupun import)
+flutter analyze  -> No issues found!
+```
+
+### Bug yang tertangkap oleh test baru
+
+`test/format_test.dart` (13 test, `test()` biasa tanpa widget) langsung menangkap
+bug di `emailFromRefresh`. Versi pertama yang diambil dari `home_page.dart`
+mengembalikan **string kosong** untuk input `refresh:` (prefix ada, isi tidak),
+padahal `null` yang benar. Efeknya di UI: baris "Pengguna campus" berubah jadi
+baris kosong, bukan jatuh kembali ke teks default.
+
+Bug ini lolos dari 10 test Week 6 karena tidak pernah diuji — logikanya
+tersembunyi di dalam widget, dan satu-satunya cara mengujinya adalah memompa
+seluruh `HomePage` beserta plugin Firebase-nya.
+
+```
+Sebelum diperbaiki: emailFromRefresh('refresh:') -> ""   (test mengharapkan null)
+Sesudah diperbaiki: emailFromRefresh('refresh:') -> null
+```
+
+Ini bukti langsung bahwa "pindahkan ke fungsi murni" bukan sekadar soal kerapian
+folder: logika yang bisa diuji tanpa widget langsung menangkap bug yang
+sebelumnya tidak terlihat.
+
+### Folder fitur sudah dibuat tapi masih kosong
+
+Isinya ditulis pada Praktikum 4: domain dulu (entity, repository interface,
+use case), lalu data (model, repository impl), lalu presentation (wiring DI dan
+halaman). File lama di `lib/data/`, `lib/pages/`, `lib/providers/`, dan
+`lib/messaging/` **belum dihapus**, supaya aplikasi masih bisa dijalankan sebagai
+perbandingan.
+
+### Status test
+
+```
+Sebelum Praktikum 3 : 10 test (test/auth_push_test.dart + test/widget_test.dart)
+Sesudah Praktikum 3: 23 test (+ test/format_test.dart, 13 test)
+flutter analyze     -> No issues found!
+flutter test        -> All tests passed!
+```
+
+### Catatan: kenapa `core/` ada di luar `features/`
+
+`core/` dipakai bersama lebih dari satu fitur: `Failure` dipakai auth,
+announcements, dan notifications; `format` dipakai kartu debug di home maupun
+login. Menaruhnya per fitur berarti duplikasi. Rule yang dipakai: kalau hanya
+satu fitur yang memakainya, taruh di `features/*/`.
+
 ## Arah Dependensi
 
 ### Sebelum
@@ -251,6 +373,19 @@ berbeda (`Provider<Dio>` bukan `Dio(`, `padLeft` bukan `DateFormat`). Karena itu
 setiap pencarian ditulis dua kali — pattern codelab verbatim dan pattern yang
 diadaptasi ke kode nyata — supaya "nol hasil" benar-benar berarti bersih, bukan
 sekadar pattern yang kebetulan tidak cocok.
+
+## Screenshot
+
+| Berkas | Isi |
+|---|---|
+| `screenshots/before.jpeg` | Dashboard `campus_notify` masih struktur Week 6, sebelum refactor |
+| `screenshots/after.jpeg` | Dashboard setelah refactor — UI harus identik, struktur folder berbeda |
+
+Yang dibuktikan lewat perbandingan dua file ini: refactor Clean Architecture
+tidak mengubah apa yang dilihat pengguna. Kartu **Debug token** hanya menampilkan
+12 karakter pertama token (`mock-access...`), jadi aman dimuat ke laporan.
+
+![Dashboard sebelum refactor](screenshots/before.jpeg)
 
 ## Struktur Folder
 

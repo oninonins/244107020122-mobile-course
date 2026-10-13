@@ -64,49 +64,155 @@ kolom **Layer target** diisi pada Praktikum 3.
 
 ## Praktikum 2 — Tiga Pelanggaran Klasik
 
-Ditemukan dengan pencarian di `lib/pages`, `lib/providers`, dan `lib/main.dart`.
+Ditemukan dengan `rg` (ripgrep 15.2.0) pada baseline sebelum refactor.
+
+### Temuan penting: pattern codelab tidak berlaku untuk project ini
+
+Dua dari tiga perintah pada codelab **nol hasil**, padahal melanggarannya nyata.
+Penyebabnya bukan tidak ada pelanggaran, melainkan nama folder dan nama tipenya berbeda:
+
+| Perintah codelab | Hasil | Penyebab |
+|---|---|---|
+| `rg ... lib/pages lib/widgets` | error | `lib/widgets` tidak ada di `campus_notify`; widget dikumpulkan di `lib/pages` |
+| `rg "Dio\(\|...\|FlutterSecureStorage" lib/pages lib/widgets` | **0 hasil** | Kode menulis `Provider<Dio>((ref) => ...)` sehingga tidak ada literal `Dio(`. `FlutterSecureStorage` dipakai di `data/token_store.dart`, bukan di presentation |
+| `rg "DateFormat\|jsonDecode\|\.toIso8601String" ...` | **0 hasil** | Format tanggal di sini memakai `padLeft`, bukan `DateFormat` |
+
+Kesimpulannya: **nol hasil dari pattern yang terlalu sempit bukan bukti bersih.**
+Karena itu tiap grep di bawah dijalankan dua kali — pattern codelab verbatim
+(lengkap dengan koreksi path), lalu pattern yang diadaptasi ke kode nyata.
 
 ### 1. Presentation menyentuh jaringan dan penyimpanan langsung
 
 ```
-providers/auth_provider.dart:12: final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());
+rg "Dio\(|http\.|openDatabase|SharedPreferences\.getInstance|FlutterSecureStorage" lib/pages lib/providers
+(0 hasil — pattern tidak cocok, lihat tabel di atas)
 ```
 
-Menyimpan token lewat plugin `flutter_secure_storage` di dalam presentation.
+Diadaptasi:
+
+```
+rg "Dio\(|SecureTokenStore\(|FlutterSecureStorage|apiClientProvider|package:dio" lib/pages lib/providers lib/main.dart
+lib\providers\auth_provider.dart:3:import 'package:dio/dio.dart';
+lib\providers\auth_provider.dart:12:final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());
+lib\providers\auth_provider.dart:23:final apiClientProvider = Provider<Dio>((ref) {
+lib\providers\auth_provider.dart:62:  unawaited(registerDevice(ref.read(apiClientProvider)));
+lib\pages\home_page.dart:118:      ref.read(apiClientProvider),
+lib\main.dart:137:    await registerDevice(ref.read(apiClientProvider));
+```
+
+Enam baris. Presentation mengimpor `package:dio`, menyebut tipe `Dio`, dan
+memanggil plugin penyimpanan token secara langsung. Ini pelanggaran paling berat
+karena memutus seluruh aturan dependensi.
 
 ### 2. Instansiasi manual — DI bocor
 
 ```
-providers/auth_provider.dart:12: final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());
-providers/auth_provider.dart:17: (ref) => MockAuthRepository(),
-providers/auth_provider.dart:24: return buildApiClient(
+rg "Repository\(|Dio\(BaseOptions" lib/pages lib/providers
+lib\providers\auth_provider.dart:17:  (ref) => MockAuthRepository(),
 ```
 
-Provider di presentation meng-*instantiate* `SecureTokenStore`, `MockAuthRepository`,
-dan `Dio`. Widget dan notifier sebaiknya hanya membaca provider, bukan tahu
-bagaimana implementasinya dibuat.
+Diadaptasi:
+
+```
+rg "TokenStore\(|MockAuthRepository\(|buildApiClient\(|Dio\(" lib/pages lib/providers
+lib\providers\auth_provider.dart:12:final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());
+lib\providers\auth_provider.dart:17:  (ref) => MockAuthRepository(),
+lib\providers\auth_provider.dart:24:  return buildApiClient(
+```
+
+Provider di presentation meng-*instantiate* `SecureTokenStore`,
+`MockAuthRepository`, dan `Dio`. Widget seharusnya hanya membaca provider, bukan
+tahu bagaimana implementasinya dibuat.
 
 ### 3. Logika format dan parsing di dalam widget
 
 ```
-pages/home_page.dart:55:  String two(int n) => n.toString().padLeft(2, '0');
-pages/home_page.dart:105: return refresh.substring('refresh:'.length).split('|').first;
+rg "DateFormat|jsonDecode|\.toIso8601String" lib/pages lib/widgets
+(0 hasil — pattern tidak cocok)
 ```
 
-`_formatTime()` dan `_emailFromRefresh()` adalah fungsi murni yang layak dipindah ke
-`core/format.dart` supaya bisa diuji tanpa widget.
+Diadaptasi:
+
+```
+rg "padLeft|\.substring\(|\.split\(|formatTime|_emailFromRefresh|maskToken" lib/pages lib/providers
+lib\pages\home_page.dart:41:        _fcmToken = maskToken(token);
+lib\pages\home_page.dart:42:        _tokenUpdatedAt = _formatTime(tokenUpdatedAt);
+lib\pages\home_page.dart:53:  static String _formatTime(DateTime? time) {
+lib\pages\home_page.dart:55:    String two(int n) => n.toString().padLeft(2, '0');
+lib\pages\home_page.dart:65:      _maskedAccess = maskToken(access);
+lib\pages\home_page.dart:66:      _maskedRefresh = maskToken(refresh);
+lib\pages\home_page.dart:67:      _email = _emailFromRefresh(refresh);
+lib\pages\home_page.dart:78:      _tokenUpdatedAt = _formatTime(tokenUpdatedAt);
+lib\pages\home_page.dart:103:  String? _emailFromRefresh(String? refresh) {
+lib\pages\home_page.dart:105:    return refresh.substring('refresh:'.length).split('|').first;
+```
+
+`_formatTime()` (`:53`) dan `_emailFromRefresh()` (`:103`) adalah fungsi murni tanpa
+ketergantungan widget. Keduanya layak dipindah ke `core/format.dart` supaya bisa diuji
+tanpa `testWidgets`.
 
 ### 4. Tipe milik data layer bocor ke presentation
 
 ```
-pages/login_page.dart:39:           error is AuthFailure ? error.message : '...',
-pages/home_page.dart:117:            await registerDevice(
-pages/home_page.dart:118:              ref.read(apiClientProvider),
-main.dart:137:          await registerDevice(ref.read(apiClientProvider));
+rg "AuthFailure|AuthSession|registerDevice\(|readableApiError|maskToken" lib/pages lib/providers lib/main.dart
+lib\pages\login_page.dart:39:      error is AuthFailure ? error.message : 'Login gagal. Coba lagi.',
+lib\pages\home_page.dart:117:    await registerDevice(
+lib\pages\home_page.dart:118:      ref.read(apiClientProvider),
+lib\main.dart:137:    await registerDevice(ref.read(apiClientProvider));
 ```
 
-Tiga tempat ini harus hilang setelah refactor: presentation tidak boleh
-menyebut `AuthFailure`, `Dio`, atau `apiClientProvider`.
+Empat tempat. Presentation memeriksa tipe milik data layer (`AuthFailure`) dan
+mengirim `Dio` ke fungsi data. Semuanya harus hilang setelah refactor.
+
+### 5. Import presentation langsung ke folder data dan messaging
+
+```
+rg "^import '\.\./(data|messaging)/|^import '(data|messaging)/" lib/pages lib/providers lib/main.dart
+lib\main.dart:8:import 'messaging/push_service.dart';
+lib\providers\auth_provider.dart:6:import '../data/api_client.dart';
+lib\providers\auth_provider.dart:7:import '../data/auth_repository.dart';
+lib\providers\auth_provider.dart:8:import '../data/token_store.dart';
+lib\providers\auth_provider.dart:9:import '../messaging/push_service.dart';
+lib\pages\login_page.dart:4:import '../data/auth_repository.dart';
+lib\pages\home_page.dart:7:import '../data/auth_repository.dart';
+lib\pages\home_page.dart:8:import '../messaging/push_service.dart';
+```
+
+Delapan import lintas layer. Tidak satu pun yang benar-benar butuh `data/`: yang
+dibutuhkan hanya *kontrak*-nya. Setelah refactor, `pages/` dan `providers/`
+hanya boleh mengimpor `domain/` — bukan `features/*/data/` maupun package
+Dio/Firebase.
+
+### Daftar item refactor
+
+Setiap temuan adalah satu item pekerjaan pada Praktikum 3.
+
+| # | Item | Lokasi | Layer tujuan |
+|---|---|---|---|
+| 1 | Menyebut tipe `Dio` | `auth_provider.dart:3,23` | `features/notifications/data/` |
+| 2 | `SecureTokenStore()` di presentation | `auth_provider.dart:12` | `features/auth/data/datasources/` |
+| 3 | `MockAuthRepository()` di presentation | `auth_provider.dart:17` | `features/auth/data/repositories/` |
+| 4 | `buildApiClient()` di presentation | `auth_provider.dart:24` | `features/notifications/data/` |
+| 5 | Kirim Dio ke `registerDevice` | `auth_provider.dart:62` | ganti dengan `DeviceRegistrar` |
+| 6 | Kirim Dio ke `registerDevice` | `home_page.dart:118` | ganti dengan use case |
+| 7 | Kirim Dio ke `registerDevice` | `main.dart:137` | ganti dengan use case |
+| 8 | `_formatTime` di widget | `home_page.dart:53` | `core/format.dart` |
+| 9 | `_emailFromRefresh` di widget | `home_page.dart:103` | `core/format.dart` |
+| 10 | `error is AuthFailure` | `login_page.dart:39` | `core/failures.dart` + record |
+| 11 | Import `data/` dari presentation | `auth_provider.dart:6,7,8`, `login_page.dart:4`, `home_page.dart:7` | domain repository interface |
+| 12 | Import `messaging/` dari presentation | `main.dart:8`, `auth_provider.dart:9`, `home_page.dart:8` | domain push interfaces |
+
+Total **12 item refactor** di 5 file: `auth_provider.dart`, `home_page.dart`,
+`login_page.dart`, `main.dart`, dan (sebagai target) `push_service.dart`.
+
+### Verifikasi
+
+Tidak ada kode yang diubah pada Praktikum 2, jadi baseline tetap utuh.
+
+```
+flutter analyze   -> No issues found!
+flutter test      -> All tests passed! (10 test)
+```
 
 ## Arah Dependensi
 
@@ -136,10 +242,15 @@ data (model, repository impl, Dio, Firebase, secure storage)
 
 ## Catatan tentang `rg`
 
-Codelab memverifikasi dengan ripgrep, yang belum terpasang di mesin ini. Semua
-pemetaan di atas memakai `Select-String` PowerShell dengan pola yang sama.
-Perintah verifikasi pada Praktikum 3 ditulis dalam dua bentuk: `rg` (sesuai
-codelab) dan `Select-String` (ekuivalen di PowerShell).
+Verifikasi memakai [ripgrep](https://github.com/BurntSushi/ripgrep) 15.2.0
+(`winget install BurntSushi.ripgrep.MSVC`), sesuai perintah codelab.
+
+Kesalahan yang perlu diketahui: pola di codelab tidak langsung berlaku untuk
+`campus_notify` karena (a) folder `lib/widgets` tidak ada dan (b) penamaan kode
+berbeda (`Provider<Dio>` bukan `Dio(`, `padLeft` bukan `DateFormat`). Karena itu
+setiap pencarian ditulis dua kali — pattern codelab verbatim dan pattern yang
+diadaptasi ke kode nyata — supaya "nol hasil" benar-benar berarti bersih, bukan
+sekadar pattern yang kebetulan tidak cocok.
 
 ## Struktur Folder
 

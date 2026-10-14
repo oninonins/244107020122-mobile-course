@@ -312,13 +312,14 @@ Ini bukti langsung bahwa "pindahkan ke fungsi murni" bukan sekadar soal kerapian
 folder: logika yang bisa diuji tanpa widget langsung menangkap bug yang
 sebelumnya tidak terlihat.
 
-### Folder fitur sudah dibuat tapi masih kosong
+### Folder fitur diisi pada tahap berikutnya
 
-Isinya ditulis pada Praktikum 4: domain dulu (entity, repository interface,
-use case), lalu data (model, repository impl), lalu presentation (wiring DI dan
-halaman). File lama di `lib/data/`, `lib/pages/`, `lib/providers/`, dan
-`lib/messaging/` **belum dihapus**, supaya aplikasi masih bisa dijalankan sebagai
-perbandingan.
+> **Catatan:** bagian ini ditulis saat Praktikum 3 selesai. Isinya sudah
+> **selesai dikerjakan** — lihat bagian "Refactoring Challenge — Hasil".
+> `lib/features/` kini terisi penuh dan folder `lib/data/`, `lib/pages/`,
+> `lib/providers/`, `lib/messaging/` **sudah dihapus**. Keduanya tidak
+> dihapus sekaligus supaya aplikasi tetap bisa dijalankan sebagai perbandingan
+> di antara dua tahap tersebut.
 
 ### Status test
 
@@ -374,54 +375,124 @@ setiap pencarian ditulis dua kali — pattern codelab verbatim dan pattern yang
 diadaptasi ke kode nyata — supaya "nol hasil" benar-benar berarti bersih, bukan
 sekadar pattern yang kebetulan tidak cocok.
 
-## Screenshot
+## Fitur Utama
 
-| Berkas | Isi |
-|---|---|
-| `screenshots/before.jpeg` | Dashboard `campus_notify` masih struktur Week 6, sebelum ada `lib/core/` |
-| `screenshots/after.jpeg` | Dashboard setelah `lib/core/` ditambahkan (Praktikum 3) |
-
-Kedua gambar diambil di perangkat Android nyata (Redmi 24094RAD4G) dan
-menunjukkan aplikasi berjalan normal setelah `flutter run`.
-
-| Aspek | `before.jpeg` | `after.jpeg` |
+| Fitur | Implementasi | Lokasi |
 |---|---|---|
-| Kartu Sesi aktif | `nino@gmail.com` | `nino@gmail.com` |
-| Access token ter-mask | `mock-access...` | `mock-access...` |
-| Refresh token ter-mask | `refresh:nino...` | `refresh:nino...` |
-| Baris "Diperbarui" di Debug FCM | tidak ada | `11:53:33` |
+| Login + guard route | GoRouter `redirect`, belum login selalu ke `/login` | `main.dart`, `features/auth/presentation/` |
+| Penyimpanan token aman | `flutter_secure_storage` (Keychain/Keystore) | `features/auth/data/datasources/secure_token_store.dart` |
+| Refresh token otomatis | Dio interceptor mencoba refresh **sekali** saat 401 | `features/auth/data/api_client.dart` |
+| Validasi kredensial | Aturan bisnis di domain, dipakai widget untuk pesan inline | `features/auth/domain/usecases/login.dart` |
+| Kartu debug token | Masking 12 karakter pertama, tidak pernah menampilkan token penuh | `core/format.dart`, `auth_providers.dart` |
+| Pengumuman campus | Entity + kontrak + use case + repository mock dari seed JSON | `features/announcements/` |
+| Deep link notifikasi | `data.route` → `routeFromMessage()` → navigasi GoRouter | `core/format.dart`, `routes.dart` |
+| FCM: token & izin | `getToken()` + listener `onTokenRefresh` (wajib) | `features/notifications/data/firebase_push_repository.dart` |
+| FCM: topik broadcast | Subscribe/unsubscribe `pengumuman-kampus` | idem |
+| FCM: tiga app state | Foreground, background, terminated | idem, plus `handleTerminated()` di `core/format.dart` |
+| Pendaftaran token ke backend | `POST /devices`, hanya kalau sesi sudah ada | `features/notifications/domain/usecases/register_device.dart` |
+| Debug FCM di dashboard | Status izin, token ter-mask, waktu pembaruan, toggle topik | `features/announcements/presentation/pages/home_page.dart` |
 
-Dua catatan penting, supaya gambar ini tidak disalahartikan:
+## Stack Teknologi
 
-1. **`after.jpeg` belum mewakili refactor Clean Architecture.** Pada titik ini
-   Praktikum 1–3 selesai (dokumentasi + `lib/core/`), tetapi Praktikum 4
-   belum dimulai — `lib/data/`, `lib/pages/`, `lib/providers/`, dan
-   `lib/messaging/` masih utuh. Screenshot "after" yang sebenarnya untuk
-   pembuktian refactor akan diambil ulang setelah domain layer selesai.
-2. **Kedua gambar tidak identik.** `before.jpeg` diambil dari build lama yang
-   belum menampilkan baris "Diperbarui" di kartu Debug FCM. Perbandingan
-   yang sahih untuk pembuktian "UI identik" akan dibuat ulang nanti.
+| Teknologi | Versi | Peran |
+|---|---|---|
+| Flutter | 3.47.5 | Framework |
+| Dart | 3.13.4 | Bahasa (records untuk sukses/gagal) |
+| flutter_riverpod | ^3.4.3 | State management + DI (tanpa package DI tambahan) |
+| go_router | ^18.0.2 | Routing, guard, deep link |
+| dio | ^5.11.1 | HTTP client + interceptor refresh token |
+| flutter_secure_storage | ^11.2.0 | Penyimpanan token (Keychain/Keystore) |
+| firebase_core | ^4.15.0 | Inisialisasi Firebase |
+| firebase_messaging | ^16.7.0 | Push notification, token lifecycle, topik |
+| flutter_local_notifications | ^22.3.1 | Banner notifikasi manual saat foreground |
+| flutter_lints | ^6.0.0 | Analisis statis |
+| ripgrep | 15.2.0 | **Alat verifikasi**, bukan dependency aplikasi |
 
-Yang sudah terbukti dari kedua gambar: token tidak pernah ditampilkan penuh —
-hanya 12 karakter pertama, sehingga aman dimuat ke laporan.
+## Cara Menjalankan
 
-### Sebelum
+```bash
+cd campus_notify
+flutter pub get
 
-![Dashboard sebelum penambahan lib/core](screenshots/before.jpeg)
+# Salin google-services.json ke android/app/ (file ini tidak di-commit)
+flutter run
+```
 
-### Sesudah
+Butuh perangkat Android nyata atau emulator dengan Google Play Services. Login
+memakai akun demo: email berformat email, kata sandi minimal 6 karakter.
 
-![Dashboard sesudah penambahan lib/core](screenshots/after.jpeg)
+Menjalankan test dan verifikasi arsitektur:
+
+```bash
+flutter analyze
+flutter test
+
+# Dua grep sterilitas wajib codelab
+rg "Dio\(|openDatabase|getDatabasesPath|FlutterSecureStorage|SharedPreferences\.getInstance|jsonDecode" \
+   lib/features/*/presentation
+rg "import 'package:flutter|import 'package:dio|import 'package:sqflite|import 'package:firebase" \
+   lib/features/*/domain lib/core
+```
+
+Hasil lengkap ada di `docs/verification-grep.md`.
+
+## Hasil yang Dicapai
+
+### Angka
+
+| | Sebelum | Sesudah |
+|---|---|---|
+| File Dart di `lib/` | 12 (datar) | 28 (3 fitur vertikal) |
+| Folder di `lib/` | `data`, `pages`, `providers`, `messaging` | `core` + 3 fitur × 3 layer |
+| Kontrak di `domain/` | 0 | 7 |
+| Implementasi di `data/` | tercampur dengan kontrak | 6, terpisah |
+| Test | 10 | 43 |
+| Grep presentation bocor | 6 baris | 0 |
+| Baris `Dio` di presentation | 3 | 0 |
+
+### Yang benar-benar berubah
+
+- **Aturan dependensi ditegakkan.** `domain` tidak lagi tahu apa pun tentang
+  Flutter, Dio, atau plugin penyimpanan - terbukti nol hasil grep, bukan
+  pembacaan sekilas.
+- **Validasi bisa diuji tanpa widget.** Aturan email/kata sandi pindah dari
+  `login_page.dart` ke `Login`. Test memastikannya dengan `test()` biasa; dulu
+  satu-satunya cara mengujinya adalah memompa seluruh halaman.
+- **Bug tertangkap yang sebelumnya tidak terlihat.** `emailFromRefresh('refresh:')`
+  mengembalikan string kosong, bukan `null`. Bug ini lolos 10 test Week 6 karena
+  logikanya tersembunyi di dalam widget.
+- **UI tidak berubah.** 28 file berubah, tampilan tetap sama - buktinya di
+  bagian Screenshot.
+- **8 operasi sengaja tidak dijadikan use case**, lengkap dengan alasannya.
+
+### Yang sengaja tidak dikerjakan
+
+- **Tidak ada backend sungguhan.** `POST /devices` dan `/auth` masih mock, sama
+  seperti Week 6. Kegagalannya ditampilkan di debug card sebagai bukti alur
+  token benar-benar memanggil jaringan.
+- **`formatDate` belum dipakai.** Codelab menyebut "formatting tanggal",
+  padahal aplikasi memakai format jam. Fungsi ini bisa dihapus tanpa efek apa
+  pun.
+- **Uji manual lima menit per fitur** - butuh perangkat fisik dan interaksi
+  nyata; yang sudah dilakukan baru `flutter run` dan memastikan tidak ada
+  exception.
 
 ## Struktur Folder
 
 ```
 07-week-7-clean-architecture/
 ├── campus_notify/          # aplikasi Flutter (hasil refactor)
-├── docs/                   # catatan AI challenge, peta refactor, hasil verifikasi
-├── screenshots/            # bukti before/after
+├── docs/
+│   ├── ai-challenge.md     # prompt, usulan AI, checklist verifikasi, trade-off
+│   ├── refactor-map.md     # peta tiap file lama -> pindah / pecah / hapus
+│   └── verification-grep.md# output grep asli + analyze + test
+├── screenshots/            # before / after / after-refactor
 └── README.md
 ```
+
+> Ada juga folder `lib/` dan `test/` kosong di level ini. Keduanya sisa template
+> awal dan **tidak dipakai** — `lib/` dan `test/` yang sebenarnya ada di dalam
+> `campus_notify/`.
 
 ## Refactoring Challenge — Hasil
 
@@ -661,7 +732,55 @@ sendiri.
 
 ## Screenshot
 
-| Berkas | Isi |
-|---|---|
-| `screenshots/before.jpeg` | Dashboard `campus_notify` masih struktur Week 6 |
-| `screenshots/after.jpeg` | Dashboard setelah refactor Clean Architecture selesai |
+Tiga gambar, semuanya dari perangkat Android nyata (Redmi 24094RAD4G), diambil
+berurutan waktu:
+
+| Berkas | Waktu | Isi |
+|---|---|---|
+| `screenshots/before.jpeg` | 13 Okt 18:51 | Build lama, struktur Week 6 |
+| `screenshots/after.jpeg` | 14 Okt 11:56 | Struktur Week 6 + `lib/core/`, **sebelum** refactor |
+| `screenshots/after-refactor.jpeg` | 14 Okt 12:41 | **Sesudah** refactor Clean Architecture selesai |
+
+### Pasangan perbandingan yang sahih
+
+Checklist codelab meminta bukti bahwa *"aplikasi berjalan identik
+sebelum/sesudah refactor"*. Pasangan yang benar adalah dua gambar **tengah** dan
+**akhir**, karena keduanya diambil dari build yang benar:
+
+| Aspek | `after.jpeg` (sebelum refactor) | `after-refactor.jpeg` (sesudah) | Berubah? |
+|---|---|---|---|
+| Kartu Sesi aktif | `nino@gmail.com` | `nino@gmail.com` | tidak |
+| Access token ter-mask | `mock-access...` | `mock-access...` | tidak |
+| Refresh token ter-mask | `refresh:nino...` | `refresh:nino...` | tidak |
+| Baris "Diperbarui" | `11:53:33` | `12:36:56` | hanya jam |
+| Tombol & urutan kartu | sama | sama | tidak |
+
+Kesimpulannya: 28 file berubah, `lib/` berubah total dari 12 file datar menjadi
+28 file vertikal, dan **yang dilihat pengguna tidak berubah satu baris pun**.
+
+### Catatan penting tentang `before.jpeg`
+
+`before.jpeg` **tidak sepenuhnya mencerminkan baseline** commit `ffe1706`.
+Gambar itu diambil dari build yang lebih lama: kartu Debug FCM-nya belum
+menampilkan baris "Diperbarui", padahal pada `ffe1706` baris itu **sudah ada**
+di `home_page.dart:188`.
+
+Jadi `before.jpeg` disimpan sebagai catatan historis, bukan sebagai bukti
+"sebelum refactor". Bukti yang sahih adalah pasangan di tabel atas.
+
+### Yang terbukti dari ketiga gambar
+
+Token tidak pernah ditampilkan penuh — hanya 12 karakter pertama pada ketiganya,
+sehingga aman dimuat ke laporan.
+
+### Sebelum
+
+![Dashboard sebelum refactor](screenshots/before.jpeg)
+
+### Sesudah — struktur Week 6 + lib/core
+
+![Dashboard sesudah penambahan lib/core, sebelum refactor](screenshots/after.jpeg)
+
+### Sesudah — refactor Clean Architecture selesai
+
+![Dashboard sesudah refactor Clean Architecture](screenshots/after-refactor.jpeg)

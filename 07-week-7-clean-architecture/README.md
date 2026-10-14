@@ -378,14 +378,40 @@ sekadar pattern yang kebetulan tidak cocok.
 
 | Berkas | Isi |
 |---|---|
-| `screenshots/before.jpeg` | Dashboard `campus_notify` masih struktur Week 6, sebelum refactor |
-| `screenshots/after.jpeg` | Dashboard setelah refactor — UI harus identik, struktur folder berbeda |
+| `screenshots/before.jpeg` | Dashboard `campus_notify` masih struktur Week 6, sebelum ada `lib/core/` |
+| `screenshots/after.jpeg` | Dashboard setelah `lib/core/` ditambahkan (Praktikum 3) |
 
-Yang dibuktikan lewat perbandingan dua file ini: refactor Clean Architecture
-tidak mengubah apa yang dilihat pengguna. Kartu **Debug token** hanya menampilkan
-12 karakter pertama token (`mock-access...`), jadi aman dimuat ke laporan.
+Kedua gambar diambil di perangkat Android nyata (Redmi 24094RAD4G) dan
+menunjukkan aplikasi berjalan normal setelah `flutter run`.
 
-![Dashboard sebelum refactor](screenshots/before.jpeg)
+| Aspek | `before.jpeg` | `after.jpeg` |
+|---|---|---|
+| Kartu Sesi aktif | `nino@gmail.com` | `nino@gmail.com` |
+| Access token ter-mask | `mock-access...` | `mock-access...` |
+| Refresh token ter-mask | `refresh:nino...` | `refresh:nino...` |
+| Baris "Diperbarui" di Debug FCM | tidak ada | `11:53:33` |
+
+Dua catatan penting, supaya gambar ini tidak disalahartikan:
+
+1. **`after.jpeg` belum mewakili refactor Clean Architecture.** Pada titik ini
+   Praktikum 1–3 selesai (dokumentasi + `lib/core/`), tetapi Praktikum 4
+   belum dimulai — `lib/data/`, `lib/pages/`, `lib/providers/`, dan
+   `lib/messaging/` masih utuh. Screenshot "after" yang sebenarnya untuk
+   pembuktian refactor akan diambil ulang setelah domain layer selesai.
+2. **Kedua gambar tidak identik.** `before.jpeg` diambil dari build lama yang
+   belum menampilkan baris "Diperbarui" di kartu Debug FCM. Perbandingan
+   yang sahih untuk pembuktian "UI identik" akan dibuat ulang nanti.
+
+Yang sudah terbukti dari kedua gambar: token tidak pernah ditampilkan penuh —
+hanya 12 karakter pertama, sehingga aman dimuat ke laporan.
+
+### Sebelum
+
+![Dashboard sebelum penambahan lib/core](screenshots/before.jpeg)
+
+### Sesudah
+
+![Dashboard sesudah penambahan lib/core](screenshots/after.jpeg)
 
 ## Struktur Folder
 

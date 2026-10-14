@@ -1,7 +1,8 @@
-import 'package:campus_notify/data/auth_repository.dart';
-import 'package:campus_notify/data/token_store.dart';
+import 'package:campus_notify/features/auth/data/datasources/secure_token_store.dart';
+import 'package:campus_notify/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:campus_notify/features/auth/domain/repositories/token_store.dart';
+import 'package:campus_notify/features/auth/presentation/providers/auth_providers.dart';
 import 'package:campus_notify/main.dart';
-import 'package:campus_notify/providers/auth_provider.dart';
 import 'package:campus_notify/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

@@ -1,21 +1,12 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Kontrak penyimpanan token. Token hanya boleh keluar-masuk lewat kelas ini.
-abstract interface class TokenStore {
-  Future<void> save({required String access, required String refresh});
-
-  Future<String?> readAccess();
-
-  Future<String?> readRefresh();
-
-  Future<void> clear();
-}
+import '../../domain/repositories/token_store.dart';
 
 /// Implementasi produksi di atas `flutter_secure_storage`
 /// (iOS Keychain / Android Keystore).
 ///
-/// Jangan pernah ganti ini dengan SharedPreferences: SharedPreferences
-/// disimpan sebagai teks biasa di disk tanpa enkripsi.
+/// Live di `data` bukan `domain` supaya seluruh Mention plugin Android hanya
+/// ada di satu file. Domain hanya melihat kontrak [TokenStore].
 class SecureTokenStore implements TokenStore {
   SecureTokenStore({FlutterSecureStorage? storage})
       : _storage = storage ?? const FlutterSecureStorage();
@@ -41,8 +32,10 @@ class SecureTokenStore implements TokenStore {
   Future<void> clear() => _storage.deleteAll();
 }
 
-/// Implementasi in-memory untuk unit test, agar logika auth bisa diuji
-/// tanpa Keychain/Keystore.
+/// Implementasi in-memory untuk unit test dan widget test, agar logika auth
+/// bisa diuji tanpa Keychain/Keystore.
+///
+/// Dipakai di `test/widget_test.dart` lewat `tokenStoreProvider.overrideWithValue`.
 class InMemoryTokenStore implements TokenStore {
   String? access;
   String? refresh;

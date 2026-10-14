@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
-import 'auth_repository.dart';
-import 'token_store.dart';
+import '../domain/repositories/auth_repository.dart';
+import '../domain/repositories/token_store.dart';
 
 /// Penanda pada `RequestOptions.extra` agar request yang sudah dicoba ulang
 /// tidak diulang lagi. Tanpa ini endpoint yang selalu 401 akan loop.
@@ -12,6 +12,10 @@ typedef SessionExpiredCallback = void Function();
 /// Membangun [Dio] yang menempelkan `Authorization: Bearer <access>` pada
 /// setiap request dan, saat menerima 401, menukar refresh token lalu mengulang
 /// request tepat satu kali.
+///
+/// Hanya butuh dua kontrak domain ([TokenStore] dan [AuthRepository]), bukan
+/// implementasi konkretnya. Itulah alasan kelas ini boleh dipakai dari
+/// `features/notifications/data` tanpa menarik dependensi auth whole.
 Dio buildApiClient({
   required TokenStore store,
   required AuthRepository auth,
@@ -43,19 +47,23 @@ Dio buildApiClient({
           return handler.next(e);
         }
 
-        try {
-          final renewed = await auth.refresh(refresh);
-          await store.save(access: renewed.access, refresh: renewed.refresh);
-          request.extra[_retriedKey] = true;
-          request.headers['Authorization'] = 'Bearer ${renewed.access}';
-          final retry = await dio.fetch<dynamic>(request);
-          return handler.resolve(retry);
-        } catch (_) {
+        // `refresh()` mengembalikan record, jadi tidak ada exception yang perlu
+        // ditangkap di sini — cukup periksa failure-nya.
+        final renewed = await auth.refresh(refresh);
+        if (renewed.session == null) {
           // Refresh ikut kedaluwarsa -> paksa login ulang.
           await _expire(store, onSessionExpired);
+          return handler.next(e);
         }
 
-        handler.next(e);
+        await store.save(
+          access: renewed.session!.access,
+          refresh: renewed.session!.refresh,
+        );
+        request.extra[_retriedKey] = true;
+        request.headers['Authorization'] = 'Bearer ${renewed.session!.access}';
+        final retry = await dio.fetch<dynamic>(request);
+        return handler.resolve(retry);
       },
     ),
   );

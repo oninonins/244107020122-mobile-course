@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/auth_repository.dart';
-import '../providers/auth_provider.dart';
+import '../providers/auth_providers.dart';
+import '../../domain/usecases/login.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -11,6 +11,19 @@ class LoginPage extends ConsumerStatefulWidget {
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
+/// Halaman ini tidak lagi tahu apa itu `AuthFailure`.
+///
+/// Week 6 menulis `error is AuthFailure ? error.message : 'Login gagal. Coba
+/// lagi.'` — presentation memeriksa tipe milik data layer. Sekarang kegagalan
+/// sampai sebagai `Failure` yang sudah dinormalisasi di domain, dan halaman ini
+/// hanya membaca `.message`.
+///
+/// Validasi form TIDAK lagi ditulis di sini.
+///
+/// Aturan "email harus berformat email" dan "minimal 6 karakter" milik use case
+/// [Login]. Widget hanya **menampilkan** hasilnya lewat
+/// [Login.validate], jadi aturan itu tidak pernah terduplikasi dan bisa diuji
+/// tanpa memompa halaman ini.
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -27,18 +40,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    final ok = await ref
+
+    final result = await ref
         .read(authStateProvider.notifier)
         .login(_emailController.text.trim(), _passwordController.text);
-    if (!mounted || ok) return;
+    if (!mounted || result.session != null) return;
 
-    final error = ref.read(authStateProvider).error;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error is AuthFailure ? error.message : 'Login gagal. Coba lagi.',
-        ),
-      ),
+      SnackBar(content: Text(result.failure?.message ?? 'Login gagal. Coba lagi.')),
     );
   }
 
@@ -81,14 +90,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         prefixIcon: Icon(Icons.alternate_email),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-                        if (email.isEmpty) return 'Email wajib diisi';
-                        if (!email.contains('@')) {
-                          return 'Format email tidak valid';
-                        }
-                        return null;
-                      },
+                      validator: (value) =>
+                          Login.validateEmail(value ?? '')?.message,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -103,22 +106,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         suffixIcon: IconButton(
                           tooltip: _obscure ? 'Tampilkan' : 'Sembunyikan',
                           icon: Icon(
-                            _obscure
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                            _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                           ),
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      validator: (value) {
-                        final password = value ?? '';
-                        if (password.isEmpty) return 'Kata sandi wajib diisi';
-                        if (password.length < 6) {
-                          return 'Minimal 6 karakter';
-                        }
-                        return null;
-                      },
+                      validator: (value) =>
+                          Login.validatePassword(value ?? '')?.message,
                       onFieldSubmitted: (_) => busy ? null : _submit(),
                     ),
                     const SizedBox(height: 24),

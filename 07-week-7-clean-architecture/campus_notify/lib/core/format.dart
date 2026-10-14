@@ -18,6 +18,8 @@
 /// test-nya naik dua orde besaran untuk satu baris `padLeft`.
 library;
 
+import '../routes.dart';
+
 // ---------------------------------------------------------------- formatting
 
 /// Memotong token agar aman ditampilkan di kartu debug dan aman masuk
@@ -72,4 +74,21 @@ String? emailFromRefresh(String? refresh) {
   // email yang valid. Tanpa pengecekan ini, kartu debug menampilkan baris
   // kosong, bukan tanpa isi sama sekali.
   return email.isEmpty ? null : email;
+}
+
+// ------------------------------------------------------------- parsing rute
+
+/// Mengubah payload `data` dari FCM menjadi rute GoRouter yang valid.
+///
+/// Dipindah ke sini sesuai Refactoring Challenge codelab: "ekstrak formatting
+/// tanggal dan parsing rute ke fungsi murni di `lib/core/format.dart` agar bisa
+/// diuji tanpa widget". Sample ini penting karena VALIDASI dari fungsi yang
+/// menyentuh Firebase hampir mustahil ditulis — dan hasilnya dipanggil dua kali
+/// di jalur terminated maupun background.
+///
+/// Sengaja berada di file bebas Firebase, jadi `test/format_test.dart` bisa
+/// mengujinya tanpa menyiapkan instance Firebase sungguhan.
+String routeFromMessage(Map<String, dynamic> data) {
+  final route = data['route'] as String? ?? Routes.home;
+  return route.startsWith('/') ? route : '${Routes.home}$route';
 }

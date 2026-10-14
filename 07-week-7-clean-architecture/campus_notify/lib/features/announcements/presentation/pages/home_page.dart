@@ -4,11 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../data/auth_repository.dart';
-import '../messaging/push_service.dart';
-import '../providers/auth_provider.dart';
-import '../routes.dart';
+import '../../../../core/format.dart';
+import '../../../../routes.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../notifications/presentation/providers/push_providers.dart';
 
+/// Dashboard.
+///
+/// Bandingkan dengan versi Week 6:
+///
+/// | Dulu (291 baris)                              | Sekarang                          |
+/// |-----------------------------------------------|-----------------------------------|
+/// | `ref.read(apiClientProvider)` -> `registerDevice` | lewat use case `registerDeviceProvider` |
+/// | `_formatTime()` sendiri                       | `core/format.dart`                |
+/// | `_emailFromRefresh()` sendiri                  | `core/format.dart`                |
+/// | `maskedToken()`, `tokenStream`, `subscribeCampusTopic()` | kontrak `PushTokenSource` |
+/// | `ref.read(tokenStoreProvider).readAccess()`    | `sessionDebugProvider`            |
+///
+/// Tidak ada lagi `Dio`, `FirebaseMessaging`, atau plugin penyimpanan di file ini.
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
@@ -17,29 +30,28 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  String? _maskedAccess;
-  String? _maskedRefresh;
-  String? _email;
   String? _permissionStatus;
-  String? _fcmToken;
-  String? _tokenUpdatedAt;
   String? _deviceStatus;
   bool _topicSubscribed = false;
+  String? _fcmToken;
+  String? _tokenUpdatedAt;
   StreamSubscription<String>? _tokenSub;
 
   @override
   void initState() {
     super.initState();
-    _loadDebugTokens();
-    _loadFcmToken();
+
+    // Token sudah diambil saat `initialize()`; ini hanya membaca salinan yang
+    // disimpan supaya tidak memanggil getToken() berulang kali.
+    _syncPushDebug();
 
     // Dengarkan token baru supaya kartu debug ikut berubah saat
     // `onTokenRefresh` berjalan, bukan hanya saat halaman dibuka.
-    _tokenSub = tokenStream.listen((token) {
+    _tokenSub = ref.read(pushTokenSourceProvider).tokenStream.listen((token) {
       if (!mounted) return;
       setState(() {
         _fcmToken = maskToken(token);
-        _tokenUpdatedAt = _formatTime(tokenUpdatedAt);
+        _tokenUpdatedAt = formatClock(ref.read(pushTokenSourceProvider).tokenUpdatedAt);
       });
     });
   }
@@ -50,82 +62,61 @@ class _HomePageState extends ConsumerState<HomePage> {
     super.dispose();
   }
 
-  static String _formatTime(DateTime? time) {
-    if (time == null) return '-';
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
-  }
-
-  Future<void> _loadDebugTokens() async {
-    final store = ref.read(tokenStoreProvider);
-    final access = await store.readAccess();
-    final refresh = await store.readRefresh();
-    if (!mounted) return;
+  void _syncPushDebug() {
+    final push = ref.read(pushTokenSourceProvider);
+    final topic = ref.read(topicSubscriptionProvider);
     setState(() {
-      _maskedAccess = maskToken(access);
-      _maskedRefresh = maskToken(refresh);
-      _email = _emailFromRefresh(refresh);
+      _fcmToken = push.maskedToken;
+      _tokenUpdatedAt = formatClock(push.tokenUpdatedAt);
+      _topicSubscribed = topic.isSubscribed;
     });
   }
 
-  Future<void> _loadFcmToken() async {
-    // Token sudah diambil saat initFcmToken; ini hanya membaca salinan yang
-    // disimpan supaya tidak memanggil getToken() berulang kali.
-    final token = maskedToken();
+  Future<void> _requestPermission() async {
+    final result = await ref.read(pushTokenSourceProvider).requestPermission();
     if (!mounted) return;
-    setState(() {
-      _fcmToken = token;
-      _tokenUpdatedAt = _formatTime(tokenUpdatedAt);
-      _topicSubscribed = isSubscribedToCampusTopic;
-    });
+    setState(() => _permissionStatus = result.granted ? 'Izin diberikan' : 'Izin ditolak');
+  }
+
+  Future<void> _registerDevice() async {
+    setState(() => _deviceStatus = 'Mengirim...');
+    final result = await ref.read(registerDeviceProvider).call();
+    if (!mounted) return;
+    setState(() => _deviceStatus = result.status ?? result.failure?.message);
   }
 
   /// Topik hanya untuk broadcast (semua mahasiswa). Pesan personal seperti
   /// nilai atau tagihan harus dikirim ke token perangkat, bukan ke topik.
   Future<void> _toggleTopic() async {
     final subscribe = !_topicSubscribed;
-    await (subscribe ? subscribeCampusTopic() : unsubscribeCampusTopic());
+    final result = await ref.read(topicSubscriptionProvider).setSubscribed(value: subscribe);
     if (!mounted) return;
-    setState(() => _topicSubscribed = subscribe);
+    setState(() => _topicSubscribed = result.subscribed);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          subscribe
-              ? 'Berlangganan topik $campusTopic'
-              : 'Berhenti berlangganan topik $campusTopic',
+          result.subscribed
+              ? 'Berlangganan topik ${result.subscribed ? topicName : ''}'.trim()
+              : 'Berhenti berlangganan topik $topicName',
         ),
       ),
     );
   }
 
-  /// Refresh token mock berbentuk `refresh:<email>|<timestamp>`. Backend
-  /// sungguhan akan mengembalikan profil lewat `GET /me`.
-  String? _emailFromRefresh(String? refresh) {
-    if (refresh == null || !refresh.startsWith('refresh:')) return null;
-    return refresh.substring('refresh:'.length).split('|').first;
+  Future<void> _simulateNotification() {
+    return ref
+        .read(pushTokenSourceProvider)
+        .simulateNotification(route: Routes.announcementDetail('3'));
   }
 
-  Future<void> _requestPermission() async {
-    final granted = await requestNotificationPermission();
-    if (!mounted) return;
-    setState(() =>
-        _permissionStatus = granted ? 'Izin diberikan' : 'Izin ditolak');
-  }
-
-  Future<void> _registerDevice() async {
-    setState(() => _deviceStatus = 'Mengirim...');
-    await registerDevice(
-      ref.read(apiClientProvider),
-      onStatus: (status) {
-        if (mounted) setState(() => _deviceStatus = status);
-      },
-    );
-  }
+  String get topicName => ref.read(topicSubscriptionProvider).topicName;
 
   Future<void> _logout() => ref.read(authStateProvider.notifier).logout();
 
   @override
   Widget build(BuildContext context) {
+    final session = ref.watch(sessionDebugProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Campus Notify'),
@@ -145,7 +136,11 @@ class _HomePageState extends ConsumerState<HomePage> {
             child: ListTile(
               leading: const Icon(Icons.person_outline),
               title: const Text('Sesi aktif'),
-              subtitle: Text(_email ?? 'Pengguna campus'),
+              subtitle: Text(
+                session.value?.email ??
+                    session.error?.toString() ??
+                    'Pengguna campus',
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -166,8 +161,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
-                  _TokenRow(label: 'Access', value: _maskedAccess),
-                  _TokenRow(label: 'Refresh', value: _maskedRefresh),
+                  _TokenRow(label: 'Access', value: session.value?.maskedAccess),
+                  _TokenRow(label: 'Refresh', value: session.value?.maskedRefresh),
                 ],
               ),
             ),
@@ -209,7 +204,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                       OutlinedButton.icon(
                         key: const Key('home-simulate-push'),
-                        onPressed: simulateNotification,
+                        onPressed: _simulateNotification,
                         icon: const Icon(Icons.notification_important_outlined),
                         label: const Text('Simulasikan notifikasi'),
                       ),
@@ -220,16 +215,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                   OutlinedButton.icon(
                     key: const Key('home-toggle-topic'),
                     onPressed: _toggleTopic,
-                    icon: Icon(_topicSubscribed
-                        ? Icons.unsubscribe_outlined
-                        : Icons.newspaper_outlined),
-                    label: Text(_topicSubscribed
-                        ? 'Berhenti berlangganan topik'
-                        : 'Berlangganan topik'),
+                    icon: Icon(
+                      _topicSubscribed
+                          ? Icons.unsubscribe_outlined
+                          : Icons.newspaper_outlined,
+                    ),
+                    label: Text(
+                      _topicSubscribed
+                          ? 'Berhenti berlangganan topik'
+                          : 'Berlangganan topik',
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Topik $campusTopic: '
+                    'Topik $topicName: '
                     '${_topicSubscribed ? 'aktif' : 'nonaktif'}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),

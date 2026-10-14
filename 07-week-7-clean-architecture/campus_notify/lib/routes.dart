@@ -2,6 +2,11 @@
 ///
 /// GoRouter dan deep link dari FCM memakai konstanta yang sama, jadi nama rute
 /// tidak bisa berbeda antara router dan payload notifikasi.
+///
+/// Catatan: fungsi `routeFromMessage` **tidak** ada di sini, melainkan di
+/// `core/format.dart`, sesuai Refactoring Challenge codelab — pemisahan format
+/// dan parsing agar bisa diuji tanpa widget. File ini tetap murni Dart, jadi
+/// `core/format.dart` mengimpornya tanpa melanggar grep sterilitas `core/`.
 abstract final class Routes {
   static const String login = '/login';
   static const String home = '/';
@@ -13,13 +18,4 @@ abstract final class Routes {
   static const String announcementPrefix = '/pengumuman/';
 
   static String announcementDetail(String id) => '$announcementPrefix$id';
-}
-
-/// Mengubah payload data FCM menjadi rute GoRouter yang valid.
-///
-/// Sengaja dibuat fungsi murni di file yang bebas Firebase supaya bisa diunit
-/// test tanpa menyiapkan instance Firebase sungguhan.
-String routeFromMessage(Map<String, dynamic> data) {
-  final route = data['route'] as String? ?? Routes.home;
-  return route.startsWith('/') ? route : '${Routes.home}$route';
 }

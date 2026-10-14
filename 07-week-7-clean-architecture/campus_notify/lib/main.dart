@@ -5,13 +5,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'messaging/push_service.dart';
-import 'pages/announcement_page.dart';
-import 'pages/home_page.dart';
-import 'pages/login_page.dart';
-import 'providers/auth_provider.dart';
+import 'features/announcements/presentation/pages/announcement_page.dart';
+import 'features/announcements/presentation/pages/home_page.dart';
+import 'features/auth/presentation/pages/login_page.dart';
+import 'features/auth/presentation/providers/auth_providers.dart';
+import 'features/notifications/data/firebase_push_repository.dart';
+import 'features/notifications/presentation/providers/push_providers.dart';
 import 'routes.dart';
 
+/// Composition root: satu-satunya tempat yang tahu semua fitur sekaligus.
+///
+/// Yang TIDAK ada di sini: `Dio`, `FlutterSecureStorage`, atau instantiate
+/// repository. Semua wiring ada di `features/*/presentation/providers/`.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -20,7 +25,8 @@ Future<void> main() async {
   await Firebase.initializeApp();
 
   // Android 10+ tidak mengirim broadcast ke app yang sudah terminated, sehingga
-  // handler harus didaftarkan lebih awal.
+  // handler harus didaftarkan lebih awal. Harus fungsi top-level dengan
+  // `@pragma('vm:entry-point')` karena berjalan di isolate terpisah.
   registerBackgroundHandler();
 
   runApp(const ProviderScope(child: CampusNotifyApp()));
@@ -34,17 +40,13 @@ class _RouterRefresh extends ChangeNotifier {
 }
 
 /// Router dibuat satu kali lewat Provider (bukan `autoDispose`), sehingga
-/// stack navigasi tetap utuh ketika status auth berubah. Provider di-cache,
-/// jadi `ref.watch` di bawah selalu mengembalikan instance yang sama.
+/// stack navigasi tetap utuh ketika status auth berubah.
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh();
 
   // `Ref.listen` milik provider tidak punya guard `debugDoingBuild`, berbeda
   // dengan `WidgetRef.listen` yang hanya boleh dipanggil di dalam build().
-  ref.listen<AsyncValue<bool>>(
-    authStateProvider,
-    (_, _) => refresh.refresh(),
-  );
+  ref.listen<AsyncValue<bool>>(authStateProvider, (_, _) => refresh.refresh());
 
   final router = GoRouter(
     initialLocation: Routes.home,
@@ -99,42 +101,32 @@ class _CampusNotifyAppState extends ConsumerState<CampusNotifyApp> {
   /// Inisialisasi messaging dilakukan setelah router siap supaya deep link
   /// dari notifikasi selalu punya tujuan.
   Future<void> _initMessaging() async {
-    // Berlangganan dulu agar deep link yang tiba saat
-    // `handleTerminated` berjalan tidak hilang.
-    _deepLinkSub = deepLinkStream.listen(_go);
+    final push = ref.read(pushTokenSourceProvider);
 
-    // Kegagalan messaging tidak boleh menjatuhkan aplikasi: di unit test
-    // plugin Firebase memang tidak terdaftar, dan di produksi konfigurasi
-    // yang salah harus tetap bisa membuka login.
+    // Berlangganan dulu agar deep link yang tiba saat kasus terminated berjalan
+    // tidak hilang.
+    _deepLinkSub = ref.read(deepLinkSourceProvider).deepLinks.listen(_go);
+
+    // Kegagalan messaging tidak boleh menjatuhkan aplikasi: di unit test plugin
+    // Firebase memang tidak terdaftar, dan di produksi konfigurasi yang salah
+    // harus tetap bisa membuka login.
     try {
-      // Kasus terminated: aplikasi dibuka dari notifikasi.
-      //
-      // Harus dipanggil SEBELUM `initFcmToken` karena `getToken()` menunggu
-      // jaringan. Kalau ditunda, navigasi deep link tertahan sampai token
-      // selesai diambil, dan gagal total saat jaringan buruk.
-      await handleTerminated();
+      // Kasus terminated: aplikasi dibuka dari notifikasi. Harus SEBELUM
+      // `initialize()` karena `getToken()` menunggu jaringan — kalau ditunda,
+      // navigasi deep link tertahan sampai token selesai diambil.
+      await push.handleTerminated();
 
-      await initLocalNotifications();
-      listenForeground();
+      await push.initLocalNotifications();
+      push.listenForeground();
 
-      // Token diambil lalu dikirim ke backend lewat `onToken`. Dipanggil lagi
-      // setelah login berhasil supaya POST /devices selalu memakai header
-      // `Authorization`.
-      await initFcmToken(onToken: _registerDevice);
+      await push.initialize(
+        onToken: (String _) async {
+          await ref.read(registerDeviceProvider).call();
+        },
+      );
     } on Object catch (error) {
       debugPrint('[messaging] inisialisasi gagal: $error');
     }
-  }
-
-  /// Mendaftarkan token ke backend lewat `POST /devices`.
-  ///
-  /// Kalau sesi belum ada, token TIDAK dikirim di sini: [\AuthNotifier.login]
-  /// mendaftarkannya ulang setelah access token tersimpan. Tanpa itu, POST
-  /// berjalan tanpa header `Authorization` dan ditolak backend.
-  Future<void> _registerDevice(String _) async {
-    final loggedIn = await ref.read(authStateProvider.future);
-    if (!loggedIn) return;
-    await registerDevice(ref.read(apiClientProvider));
   }
 
   void _go(String route) {
@@ -151,6 +143,11 @@ class _CampusNotifyAppState extends ConsumerState<CampusNotifyApp> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authStateProvider);
+
+    // Pasang bridge "daftar ulang token perangkat setelah login". Ditempel di
+    // sini, di composition root, supaya fitur auth tidak perlu tahu bahwa fitur
+    // notifikasi ada.
+    ref.watch(deviceRegistrationOnLoginProvider);
 
     return MaterialApp.router(
       title: 'Campus Notify',

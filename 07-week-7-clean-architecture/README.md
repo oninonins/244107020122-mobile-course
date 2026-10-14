@@ -422,3 +422,246 @@ hanya 12 karakter pertama, sehingga aman dimuat ke laporan.
 ├── screenshots/            # bukti before/after
 └── README.md
 ```
+
+## Refactoring Challenge — Hasil
+
+Refactor selesai. `lib/` berubah dari 12 file datar (`data/`, `pages/`,
+`providers/`, `messaging/`) menjadi 28 file di 3 fitur vertikal.
+
+### Struktur akhir
+
+```
+campus_notify/lib/
+├── main.dart                                   # composition root
+├── routes.dart                                 # konstanta rute saja
+├── core/
+│   ├── failures.dart                           # sealed Failure + 4 subtype, nol import
+│   └── format.dart                             # maskToken, formatClock, formatDate,
+│                                               # emailFromRefresh, routeFromMessage
+└── features/
+    ├── auth/
+    │   ├── domain/entities/auth_session.dart
+    │   ├── domain/repositories/{auth_repository,token_store}.dart
+    │   ├── domain/usecases/login.dart
+    │   ├── data/models/auth_session_model.dart
+    │   ├── data/datasources/secure_token_store.dart
+    │   ├── data/repositories/mock_auth_repository.dart
+    │   ├── data/api_client.dart
+    │   ├── presentation/providers/auth_providers.dart
+    │   └── presentation/pages/login_page.dart
+    ├── announcements/
+    │   ├── domain/entities/announcement.dart
+    │   ├── domain/repositories/announcement_repository.dart
+    │   ├── domain/usecases/get_announcement.dart
+    │   ├── data/models/announcement_model.dart
+    │   ├── data/repositories/mock_announcement_repository.dart
+    │   ├── presentation/providers/announcement_providers.dart
+    │   └── presentation/pages/{home_page,announcement_page}.dart
+    └── notifications/
+        ├── domain/repositories/push_repositories.dart   # 4 interface kecil
+        ├── domain/usecases/register_device.dart
+        ├── data/{firebase_push_repository,dio_device_registrar,api_errors}.dart
+        └── presentation/providers/push_providers.dart
+```
+
+### 1. Pola sama diterapkan ke kedua fitur
+
+Setiap fitur punya kelimanya: entity + repository interface + implementasi +
+1 use case + provider wiring. Tidak ada fitur yang dibiarkan setengah jadi.
+
+| Fitur | Entity | Kontrak (domain) | Implementasi (data) | Use case | Wiring DI |
+|---|---|---|---|---|---|
+| auth | `AuthSession` | `AuthRepository`, `TokenStore` | `MockAuthRepository`, `SecureTokenStore` | `Login` | `auth_providers.dart` |
+| announcements | `Announcement` | `AnnouncementRepository` | `MockAnnouncementRepository` | `GetAnnouncement` | `announcement_providers.dart` |
+| notifications | — | `PushTokenSource`, `TopicSubscription`, `DeepLinkSource`, `DeviceRegistrar` | `FirebasePushRepository`, `DioDeviceRegistrar` | `RegisterDevice` | `push_providers.dart` |
+
+`notifications` tidak punya entity karena tidak ada data bisnis yang perlu
+dipegang — hanya token, topik, dan rute. Menambahkan entity kosong untuk
+memenuhi pola akan jadi formalitas, bukan arsitektur.
+
+### 2. Formatting dan parsing rute jadi fungsi murni
+
+`core/format.dart` sekarang memegang 5 fungsi murni, nol import framework:
+
+| Fungsi | Asal | Dipakai oleh |
+|---|---|---|
+| `maskToken` | `data/auth_repository.dart:85` | kartu Debug token |
+| `formatClock` | `home_page.dart:53` | baris "Diperbarui" |
+| `formatDate` | baru | belum dipakai — lihat catatan di bawah |
+| `emailFromRefresh` | `home_page.dart:103` | kartu Sesi aktif |
+| `routeFromMessage` | `routes.dart:22` | FCM foreground + terminated |
+
+Semuanya diuji dengan `test()` biasa di `test/format_test.dart` - tanpa
+`pumpWidget`, tanpa `HomePage`, tanpa plugin Firebase. Poin Refactoring Challenge
+terpenuhi.
+
+**Catatan jujur:** `formatDate` ditambahkan tapi belum ada yang memakainya.
+Saya menambahkannya karena Instructions codelab menyebut "formatting tanggal",
+padahal format yang benar-benar dipakai aplikasi adalah jam (`HH:MM:SS`), bukan
+tanggal. Fungsi itu bisa dihapus tanpa efek apa pun.
+
+### 3. Exception mentah diganti `Failure`
+
+Sebelumnya kegagalan mengalir sebagai exception: `AuthFailure implements
+Exception` dilempar dari repository, lalu `login_page.dart:39` menulis
+`error is AuthFailure ? error.message : 'Login gagal. Coba lagi.'`. Presentation
+harus tahu bentuk error milik data layer.
+
+Sekarang:
+
+```
+repository  ->  return (session: null, failure: AuthFailure('...'))
+use case    ->  return (session: null, failure: ...)
+notifier    ->  return (session: null, failure: ...)
+widget      ->  Text(result.failure?.message ?? 'Login gagal. Coba lagi.')
+```
+
+UI hanya menerima `message`. Tidak ada satu pun `try/catch` di lapisan
+presentation, dan `error is AuthFailure` tidak lagi ada di mana pun.
+
+`flutter_secure_storage` juga sudah dinormalisasi: `SecureTokenStore` tidak
+melempar `PlatformException` ke UI.
+
+## Checklist Verifikasi Mandiri
+
+| Item | Status | Bukti |
+|---|---|---|
+| Tiga grep sterilitas nol hasil | ✅ | `docs/verification-grep.md` |
+| Interface di domain, implementasi di data, mapping hanya di model | ✅ | 7 kontrak di `domain/`, 4 `implements` semuanya di `data/` |
+| Widget tidak menginstansiasi repository | ✅ | `new` hanya di 3 file `providers/`, nol di `pages/` |
+| Aplikasi berjalan identik sebelum/sesudah | ✅ | `flutter run` di perangkat Android, tanpa exception |
+| `flutter analyze` bersih dan semua test lulus | ✅ | `No issues found!` · `All tests passed!` (43 test) |
+
+### Hasil tiga grep
+
+```
+# 1. Presentation steril dari data mentah
+rg "Dio\(|openDatabase|getDatabasesPath|FlutterSecureStorage|SharedPreferences\.getInstance|jsonDecode" \
+   lib/features/*/presentation lib/pages
+-> nol hasil
+
+# 2. Domain steril dari framework & package
+rg "import 'package:flutter|import 'package:dio|import 'package:sqflite|import 'package:firebase" \
+   lib/features/*/domain lib/core
+-> nol hasil
+
+# 3. Static analysis + test
+flutter analyze   -> No issues found!
+flutter test      -> All tests passed! (43 test)
+```
+
+Tambahan yang dipakai untuk membuktikan checklist:
+
+```
+# Entity bebas mapping
+rg "toMap|fromMap|toJson|fromJson" lib/features/*/domain
+-> nol hasil
+
+# Halaman tidak menginstansiasi repository
+rg "Repository\(|SecureTokenStore\(|Dio\(" lib/features/*/presentation/pages
+-> nol hasil
+```
+
+## Uso Case: Yang Dibuat dan Yang Ditolak
+
+Aturan yang dipakai: **use case dibuat bila ada aturan bisnis, atau operasinya
+menggabungkan lebih dari satu sumber data.**
+
+### Dibuat (3, satu per fitur)
+
+| Use case | Alasan |
+|---|---|
+| `Login` | Memegang aturan validasi email/kata sandi yang sebelumnya ada di dalam widget |
+| `GetAnnouncement` | Pintu masuk domain ke data pengumuman; dipakai `AnnouncementPage` |
+| `RegisterDevice` | Memegang aturan "hanya kirim token kalau sesi sudah ada" |
+
+### Ditolak, dengan alasan tertulis
+
+| Operasi | Alasan |
+|---|---|
+| `Logout` | Satu baris `tokenStore.clear()`, tanpa aturan apa pun |
+| `RestoreSession` | `readAccess() != null`, tanpa aturan apa pun |
+| `GetAnnouncements` | Tidak ada UI yang memakainya — akan jadi dead code |
+| `fetchAll()` di kontrak | Sama: kontrak tidak boleh menebak kebutuhan masa depan |
+| `publishedAt` di `Announcement` | Tidak ada UI yang menampilkan tanggal — generality spekulatif |
+| `RequestPermission` / `SetTopicSubscription` | Pembungkus satu panggilan, sudah mengembalikan record |
+| `AuthSessionModel` sebagai kelas mati | Dipakai di jalur produksi (`_issue()` membangkitkan JSON lalu `toEntity()`), bukan formalitas |
+
+### Deviasi dari contoh codelab
+
+Contoh `FakeNoteRepository` di codelab menulis `throw UnimplementedError()` untuk
+metode yang tidak diuji. Itu persis gejala pelanggaran Liskov Substitution yang
+disebut di bagian SOLID halaman yang sama. Di sini semua fake mengembalikan
+record kegagalan yang wajar, sehingga **setiap metode pada interface bisa
+menggantikan repository asli tanpa merusak apa pun** — dibuktikan oleh test
+`Liskov Substitution - fake benar-benar menggantikan repository asli`.
+
+## Test
+
+```
+Sebelum refactor : 23 test
+Sesudah refactor : 43 test (+20)
+
+test/format_test.dart                 13 test   fungsi murni, tanpa widget
+test/domain/login_test.dart           11 test   fake repository, tanpa Dio/storage
+test/domain/get_announcement_test.dart 4 test  fake repository
+test/domain/register_device_test.dart  3 test  fake registrar
+test/auth_push_test.dart               7 test   adaptasi test week 6
+test/widget_test.dart                 6 test   adaptasi test week 6
+```
+
+Bug nyata yang tertangkap: `emailFromRefresh('refresh:')` mengembalikan string
+kosong, bukan `null`. Bug itu lolos dari 10 test Week 6 karena logikanya
+tersembunyi di dalam widget — satu-satunya cara mengujinya adalah memompa
+`HomePage` beserta plugin Firebase-nya. Setelah dipindah ke fungsi murni,
+ketahuan di sekali jalan.
+
+## Trade-off dan Batas yang Diketahui
+
+**1. FCM tidak bisa masuk `lib/core/`.**
+Awalnya direncanakan meletakkan `push_service.dart` di `lib/core/messaging/`
+karena ia dipakai lintas fitur. Tapi grep sterilitas codelab menyisir `lib/core`
+secara rekursif, dan file itu mengimpor 4 package (dio, firebase_messaging,
+flutter, flutter_local_notifications). Memindahkannya ke sana **secara otomatis
+membuat grep #2 tidak nol** — bertabrakan langsung dengan target "3 grep nol".
+Karena itu FCM dijadikan fitur ketiga: `features/notifications/`. `lib/core/`
+tetap murni Dart, sesuai makna `core` di codelab.
+
+**2. Ada satu tautan lintas fitur.**
+`features/notifications/presentation/providers/push_providers.dart` mengimpor
+`auth_providers.dart` untuk `tokenStoreProvider` dan aksi logout. Alasannya
+nyata: `POST /devices` memakai header `Authorization`, jadi mendaftarkan token
+perangkat memang butuh sesi milik auth.
+
+Alternatifnya `lib/core/providers.dart` (untuk provider lintas fitur, yang memang
+disediakan struktur target codelab) **ditolak**: `core/` diperuntukkan bagi hal
+yang tidak punya pemilik fitur, dan begitu sesi auth pindah tempat, file itu
+ikut harus diubah — sedangkan `features/auth/...` jelas lokasinya.
+
+Untuk memutus siklus import, aturan "daftar ulang token setelah login" dipasang
+di `main.dart` lewat `deviceRegistrationOnLoginProvider`, bukan di dalam
+`AuthNotifier`. Kalau tidak, `auth` dan `notifications` saling mengimpor.
+
+**3. `Announcement.id` bertipe `String`, bukan `int`.**
+Nilainya datang dari `data.route` pada payload FCM yang selalu berupa teks.
+Mengubahnya ke `int` berarti menambahkan konversi yang belum ada yang
+membutuhkannya.
+
+**4. Grep #3 "DI bocor" masih menemukan 4 baris — dan itu memang seharusnya.**
+```
+push_providers.dart:32        return FirebasePushRepository();
+announcement_providers.dart:12 return MockAnnouncementRepository();
+auth_providers.dart:21         ... => SecureTokenStore()
+auth_providers.dart:25         ... => MockAuthRepository()
+```
+Keempatnya ada di file `providers/`, yang oleh codelab ditunjuk sebagai
+"notifier + DI" — satu-satunya tempat wiring. Yang penting dan sudah terbukti nol
+adalah instansiasi di folder `pages/`: tidak ada widget yang `new Repository()`
+sendiri.
+
+## Screenshot
+
+| Berkas | Isi |
+|---|---|
+| `screenshots/before.jpeg` | Dashboard `campus_notify` masih struktur Week 6 |
+| `screenshots/after.jpeg` | Dashboard setelah refactor Clean Architecture selesai |

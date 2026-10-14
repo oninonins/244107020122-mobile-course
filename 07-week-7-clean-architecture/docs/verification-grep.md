@@ -26,7 +26,7 @@ Semua perintah dijalankan dari `campus_notify/`.
 
 ## Tiga grep wajib codelab
 
-### Grep 1 — Presentation steril dari data mentah
+### Grep 1: Presentation steril dari data mentah
 
 ```powershell
 rg "Dio\(|openDatabase|getDatabasesPath|FlutterSecureStorage|SharedPreferences\.getInstance|jsonDecode" `
@@ -35,10 +35,10 @@ rg "Dio\(|openDatabase|getDatabasesPath|FlutterSecureStorage|SharedPreferences\.
 
 **Hasil: nol. `exit=1`** (ripgrep keluar dengan 1 saat tidak menemukan apa pun)
 
-Path `lib/pages` yang dipakai codelab sengaja dihilangkan — folder tersebut
+Path `lib/pages` yang dipakai codelab sengaja dihilangkan, folder tersebut
 sudah tidak ada karena refactor memindahkannya ke `features/*/presentation`.
 
-### Grep 2 — Domain steril dari framework & package
+### Grep 2: Domain steril dari framework & package
 
 ```powershell
 rg "import 'package:flutter|import 'package:dio|import 'package:sqflite|import 'package:firebase" `
@@ -84,7 +84,7 @@ Tidak ada widget yang `new Repository()` sendiri.
 
 ### DI terpusat di provider
 
-Perintah yang sama dijalankan di seluruh `presentation` — **hasilnya 4 baris,
+Perintah yang sama dijalankan di seluruh `presentation`, **hasilnya 4 baris,
 dan itu memang diharapkan**:
 
 ```
@@ -95,7 +95,7 @@ lib/features/notifications/presentation\providers\push_providers.dart:32:  retur
 ```
 
 Keempatnya ada di file `providers/`, yang oleh codelab ditunjuk sebagai
-"notifier + DI — inilah satu-satunya tempat wiring". Yang harus nol adalah
+"notifier + DI — Inilah satu-satunya tempat wiring". Yang harus nol adalah
 folder `pages/`, dan itu memang nol.
 
 ---
@@ -158,8 +158,8 @@ Rincian test:
 
 | Pemeriksaan | Target | Hasil |
 |---|---|---|
-| Grep 1 — presentation steril | nol | ✅ nol |
-| Grep 2 — domain steril | nol | ✅ nol |
+| Grep 1: presentation steril | nol | ✅ nol |
+| Grep 2: domain steril | nol | ✅ nol |
 | Entity bebas mapping | nol | ✅ nol |
 | Halaman tidak menginstansiasi repository | nol | ✅ nol |
 | Kontrak hanya di `domain` | semua | ✅ 7/7 |
@@ -169,8 +169,8 @@ Rincian test:
 
 ### Yang tidak bisa diverifikasi dengan grep
 
-- **Uji manual 5 menit tiap fitur** — butuh perangkat fisik dan interaksi nyata.
-- **Perbandingan before/after** — dilakukan lewat screenshot; lihat catatan di
+- **Uji manual 5 menit tiap fitur**, butuh perangkat fisik dan interaksi nyata.
+- **Perbandingan before/after**, dilakukan lewat screenshot; lihat catatan di
   `README.md` bagian Screenshot.
 
 ---

@@ -1,4 +1,4 @@
-# Week 7 — Clean Architecture
+# Week 7: Clean Architecture
 
 Refactor `campus_notify` (Week 6) menjadi struktur **feature-first** dengan tiga
 layer terpisah: `presentation → domain ← data`.
@@ -11,7 +11,7 @@ layer terpisah: `presentation → domain ← data`.
 - Membedakan entity vs model, serta peran repository, use case, dan DI.
 - Menguji use case dengan repository palsu tanpa database atau jaringan.
 
-## Praktikum 1 — Petakan File ke Layer
+## Praktikum 1: Petakan File ke Layer
 
 Baseline diambil sebelum refactor. Tabel ini adalah kondisi "sebelum";
 kolom **Layer target** diisi pada Praktikum 3.
@@ -62,7 +62,7 @@ kolom **Layer target** diisi pada Praktikum 3.
 | `lib/routes.dart` | tetap di `lib/routes.dart` |
 | `lib/data/api_errors.dart` | tetap di `features/notifications/data/api_errors.dart` |
 
-## Praktikum 2 — Tiga Pelanggaran Klasik
+## Praktikum 2: Tiga Pelanggaran Klasik
 
 Ditemukan dengan `rg` (ripgrep 15.2.0) pada baseline sebelum refactor.
 
@@ -78,14 +78,14 @@ Penyebabnya bukan tidak ada pelanggaran, melainkan nama folder dan nama tipenya 
 | `rg "DateFormat\|jsonDecode\|\.toIso8601String" ...` | **0 hasil** | Format tanggal di sini memakai `padLeft`, bukan `DateFormat` |
 
 Kesimpulannya: **nol hasil dari pattern yang terlalu sempit bukan bukti bersih.**
-Karena itu tiap grep di bawah dijalankan dua kali — pattern codelab verbatim
+Karena itu tiap grep di bawah dijalankan dua kali: pattern codelab verbatim
 (lengkap dengan koreksi path), lalu pattern yang diadaptasi ke kode nyata.
 
 ### 1. Presentation menyentuh jaringan dan penyimpanan langsung
 
 ```
 rg "Dio\(|http\.|openDatabase|SharedPreferences\.getInstance|FlutterSecureStorage" lib/pages lib/providers
-(0 hasil — pattern tidak cocok, lihat tabel di atas)
+(nol hasil, pattern tidak cocok, lihat tabel di atas)
 ```
 
 Diadaptasi:
@@ -104,7 +104,7 @@ Enam baris. Presentation mengimpor `package:dio`, menyebut tipe `Dio`, dan
 memanggil plugin penyimpanan token secara langsung. Ini pelanggaran paling berat
 karena memutus seluruh aturan dependensi.
 
-### 2. Instansiasi manual — DI bocor
+### 2. Instansiasi manual: DI bocor
 
 ```
 rg "Repository\(|Dio\(BaseOptions" lib/pages lib/providers
@@ -128,7 +128,7 @@ tahu bagaimana implementasinya dibuat.
 
 ```
 rg "DateFormat|jsonDecode|\.toIso8601String" lib/pages lib/widgets
-(0 hasil — pattern tidak cocok)
+(nol hasil, pattern tidak cocok)
 ```
 
 Diadaptasi:
@@ -180,7 +180,7 @@ lib\pages\home_page.dart:8:import '../messaging/push_service.dart';
 
 Delapan import lintas layer. Tidak satu pun yang benar-benar butuh `data/`: yang
 dibutuhkan hanya *kontrak*-nya. Setelah refactor, `pages/` dan `providers/`
-hanya boleh mengimpor `domain/` — bukan `features/*/data/` maupun package
+hanya boleh mengimpor `domain/` bukan `features/*/data/` maupun package
 Dio/Firebase.
 
 ### Daftar item refactor
@@ -214,7 +214,7 @@ flutter analyze   -> No issues found!
 flutter test      -> All tests passed! (10 test)
 ```
 
-## Praktikum 3 — Struktur Target
+## Praktikum 3: Struktur Target
 
 Feature-first: satu fitur = satu folder vertikal berisi `domain`, `data`, dan
 `presentation`. Dipilih karena `campus_notify` punya tiga fitur yang saling
@@ -299,7 +299,7 @@ mengembalikan **string kosong** untuk input `refresh:` (prefix ada, isi tidak),
 padahal `null` yang benar. Efeknya di UI: baris "Pengguna campus" berubah jadi
 baris kosong, bukan jatuh kembali ke teks default.
 
-Bug ini lolos dari 10 test Week 6 karena tidak pernah diuji — logikanya
+Bug ini lolos dari 10 test Week 6 karena tidak pernah diuji. Logikanya
 tersembunyi di dalam widget, dan satu-satunya cara mengujinya adalah memompa
 seluruh `HomePage` beserta plugin Firebase-nya.
 
@@ -315,7 +315,7 @@ sebelumnya tidak terlihat.
 ### Folder fitur diisi pada tahap berikutnya
 
 > **Catatan:** bagian ini ditulis saat Praktikum 3 selesai. Isinya sudah
-> **selesai dikerjakan** — lihat bagian "Refactoring Challenge — Hasil".
+> **selesai dikerjakan**, lihat bagian "Refactoring Challenge: Hasil".
 > `lib/features/` kini terisi penuh dan folder `lib/data/`, `lib/pages/`,
 > `lib/providers/`, `lib/messaging/` **sudah dihapus**. Keduanya tidak
 > dihapus sekaligus supaya aplikasi tetap bisa dijalankan sebagai perbandingan
@@ -371,8 +371,8 @@ Verifikasi memakai [ripgrep](https://github.com/BurntSushi/ripgrep) 15.2.0
 Kesalahan yang perlu diketahui: pola di codelab tidak langsung berlaku untuk
 `campus_notify` karena (a) folder `lib/widgets` tidak ada dan (b) penamaan kode
 berbeda (`Provider<Dio>` bukan `Dio(`, `padLeft` bukan `DateFormat`). Karena itu
-setiap pencarian ditulis dua kali — pattern codelab verbatim dan pattern yang
-diadaptasi ke kode nyata — supaya "nol hasil" benar-benar berarti bersih, bukan
+setiap pencarian ditulis dua kali: pattern codelab verbatim dan pattern yang
+diadaptasi ke kode nyata, supaya "nol hasil" berarti memang bersih, bukan
 sekadar pattern yang kebetulan tidak cocok.
 
 ## Fitur Utama
@@ -491,10 +491,10 @@ Hasil lengkap ada di `docs/verification-grep.md`.
 ```
 
 > Ada juga folder `lib/` dan `test/` kosong di level ini. Keduanya sisa template
-> awal dan **tidak dipakai** — `lib/` dan `test/` yang sebenarnya ada di dalam
+> awal dan **tidak dipakai**. `lib/` dan `test/` yang sebenarnya ada di dalam
 > `campus_notify/`.
 
-## Refactoring Challenge — Hasil
+## Refactoring Challenge: Hasil
 
 Refactor selesai. `lib/` berubah dari 12 file datar (`data/`, `pages/`,
 `providers/`, `messaging/`) menjadi 28 file di 3 fitur vertikal.
@@ -544,10 +544,10 @@ Setiap fitur punya kelimanya: entity + repository interface + implementasi +
 |---|---|---|---|---|---|
 | auth | `AuthSession` | `AuthRepository`, `TokenStore` | `MockAuthRepository`, `SecureTokenStore` | `Login` | `auth_providers.dart` |
 | announcements | `Announcement` | `AnnouncementRepository` | `MockAnnouncementRepository` | `GetAnnouncement` | `announcement_providers.dart` |
-| notifications | — | `PushTokenSource`, `TopicSubscription`, `DeepLinkSource`, `DeviceRegistrar` | `FirebasePushRepository`, `DioDeviceRegistrar` | `RegisterDevice` | `push_providers.dart` |
+| notifications | tidak ada | `PushTokenSource`, `TopicSubscription`, `DeepLinkSource`, `DeviceRegistrar` | `FirebasePushRepository`, `DioDeviceRegistrar` | `RegisterDevice` | `push_providers.dart` |
 
 `notifications` tidak punya entity karena tidak ada data bisnis yang perlu
-dipegang — hanya token, topik, dan rute. Menambahkan entity kosong untuk
+dipegang: hanya token, topik, dan rute. Menambahkan entity kosong untuk
 memenuhi pola akan jadi formalitas, bukan arsitektur.
 
 ### 2. Formatting dan parsing rute jadi fungsi murni
@@ -558,7 +558,7 @@ memenuhi pola akan jadi formalitas, bukan arsitektur.
 |---|---|---|
 | `maskToken` | `data/auth_repository.dart:85` | kartu Debug token |
 | `formatClock` | `home_page.dart:53` | baris "Diperbarui" |
-| `formatDate` | baru | belum dipakai — lihat catatan di bawah |
+| `formatDate` | baru | belum dipakai, lihat catatan di bawah |
 | `emailFromRefresh` | `home_page.dart:103` | kartu Sesi aktif |
 | `routeFromMessage` | `routes.dart:22` | FCM foreground + terminated |
 
@@ -652,9 +652,9 @@ menggabungkan lebih dari satu sumber data.**
 |---|---|
 | `Logout` | Satu baris `tokenStore.clear()`, tanpa aturan apa pun |
 | `RestoreSession` | `readAccess() != null`, tanpa aturan apa pun |
-| `GetAnnouncements` | Tidak ada UI yang memakainya — akan jadi dead code |
+| `GetAnnouncements` | Tidak ada UI yang memakainya, akan jadi dead code |
 | `fetchAll()` di kontrak | Sama: kontrak tidak boleh menebak kebutuhan masa depan |
-| `publishedAt` di `Announcement` | Tidak ada UI yang menampilkan tanggal — generality spekulatif |
+| `publishedAt` di `Announcement` | Tidak ada UI yang menampilkan tanggal, generality spekulatif |
 | `RequestPermission` / `SetTopicSubscription` | Pembungkus satu panggilan, sudah mengembalikan record |
 | `AuthSessionModel` sebagai kelas mati | Dipakai di jalur produksi (`_issue()` membangkitkan JSON lalu `toEntity()`), bukan formalitas |
 
@@ -664,7 +664,7 @@ Contoh `FakeNoteRepository` di codelab menulis `throw UnimplementedError()` untu
 metode yang tidak diuji. Itu persis gejala pelanggaran Liskov Substitution yang
 disebut di bagian SOLID halaman yang sama. Di sini semua fake mengembalikan
 record kegagalan yang wajar, sehingga **setiap metode pada interface bisa
-menggantikan repository asli tanpa merusak apa pun** — dibuktikan oleh test
+menggantikan repository asli tanpa merusak apa pun**, dibuktikan oleh test
 `Liskov Substitution - fake benar-benar menggantikan repository asli`.
 
 ## Test
@@ -683,52 +683,57 @@ test/widget_test.dart                 6 test   adaptasi test week 6
 
 Bug nyata yang tertangkap: `emailFromRefresh('refresh:')` mengembalikan string
 kosong, bukan `null`. Bug itu lolos dari 10 test Week 6 karena logikanya
-tersembunyi di dalam widget — satu-satunya cara mengujinya adalah memompa
+tersembunyi di dalam widget. Satu-satunya cara mengujinya adalah memompa
 `HomePage` beserta plugin Firebase-nya. Setelah dipindah ke fungsi murni,
 ketahuan di sekali jalan.
 
 ## Trade-off dan Batas yang Diketahui
 
-**1. FCM tidak bisa masuk `lib/core/`.**
+### 1. FCM tidak bisa masuk `lib/core/`
+
 Awalnya direncanakan meletakkan `push_service.dart` di `lib/core/messaging/`
 karena ia dipakai lintas fitur. Tapi grep sterilitas codelab menyisir `lib/core`
 secara rekursif, dan file itu mengimpor 4 package (dio, firebase_messaging,
-flutter, flutter_local_notifications). Memindahkannya ke sana **secara otomatis
-membuat grep #2 tidak nol** — bertabrakan langsung dengan target "3 grep nol".
-Karena itu FCM dijadikan fitur ketiga: `features/notifications/`. `lib/core/`
-tetap murni Dart, sesuai makna `core` di codelab.
+flutter, flutter_local_notifications). Memindahkannya ke sana membuat grep #2
+tidak nol secara otomatis, padahal targetnya nol.
 
-**2. Ada satu tautan lintas fitur.**
+Jadi FCM dijadikan fitur ketiga, `features/notifications/`, dan `lib/core/`
+tetap murni Dart sesuai makna `core` di codelab.
+
+### 2. Ada satu tautan lintas fitur
+
 `features/notifications/presentation/providers/push_providers.dart` mengimpor
 `auth_providers.dart` untuk `tokenStoreProvider` dan aksi logout. Alasannya
-nyata: `POST /devices` memakai header `Authorization`, jadi mendaftarkan token
-perangkat memang butuh sesi milik auth.
+memang ada: `POST /devices` memakai header `Authorization`, jadi mendaftarkan
+token perangkat butuh sesi milik auth.
 
-Alternatifnya `lib/core/providers.dart` (untuk provider lintas fitur, yang memang
-disediakan struktur target codelab) **ditolak**: `core/` diperuntukkan bagi hal
-yang tidak punya pemilik fitur, dan begitu sesi auth pindah tempat, file itu
-ikut harus diubah — sedangkan `features/auth/...` jelas lokasinya.
+Alternatifnya `lib/core/providers.dart` untuk provider lintas fitur (disediakan
+struktur target codelab) ditolak. `core/` diperuntukkan bagi hal yang tidak punya
+pemilik fitur, dan begitu sesi auth pindah tempat file itu ikut harus diubah,
+sedangkan `features/auth/...` jelas lokasinya.
 
-Untuk memutus siklus import, aturan "daftar ulang token setelah login" dipasang
+Siklus import diputus dengan memasang aturan "daftar ulang token setelah login"
 di `main.dart` lewat `deviceRegistrationOnLoginProvider`, bukan di dalam
 `AuthNotifier`. Kalau tidak, `auth` dan `notifications` saling mengimpor.
 
-**3. `Announcement.id` bertipe `String`, bukan `int`.**
+### 3. `Announcement.id` bertipe `String`
+
 Nilainya datang dari `data.route` pada payload FCM yang selalu berupa teks.
 Mengubahnya ke `int` berarti menambahkan konversi yang belum ada yang
 membutuhkannya.
 
-**4. Grep #3 "DI bocor" masih menemukan 4 baris — dan itu memang seharusnya.**
+### 4. Grep "DI bocor" masih menemukan 4 baris
+
 ```
 push_providers.dart:32        return FirebasePushRepository();
 announcement_providers.dart:12 return MockAnnouncementRepository();
 auth_providers.dart:21         ... => SecureTokenStore()
 auth_providers.dart:25         ... => MockAuthRepository()
 ```
-Keempatnya ada di file `providers/`, yang oleh codelab ditunjuk sebagai
-"notifier + DI" — satu-satunya tempat wiring. Yang penting dan sudah terbukti nol
-adalah instansiasi di folder `pages/`: tidak ada widget yang `new Repository()`
-sendiri.
+
+Keempatnya ada di file `providers/`, yang oleh codelab ditunjuk sebagai "notifier
++ DI", satu-satunya tempat wiring. Yang ditanyakan checklist adalah widget yang
+menginstansiasi repository sendiri, dan di folder `pages/` hasilnya nol.
 
 ## Screenshot
 
@@ -770,17 +775,17 @@ Jadi `before.jpeg` disimpan sebagai catatan historis, bukan sebagai bukti
 
 ### Yang terbukti dari ketiga gambar
 
-Token tidak pernah ditampilkan penuh — hanya 12 karakter pertama pada ketiganya,
+Token tidak pernah ditampilkan penuh, hanya 12 karakter pertama pada ketiganya,
 sehingga aman dimuat ke laporan.
 
 ### Sebelum
 
 ![Dashboard sebelum refactor](screenshots/before.jpeg)
 
-### Sesudah — struktur Week 6 + lib/core
+### Sesudah: struktur Week 6 + lib/core
 
 ![Dashboard sesudah penambahan lib/core, sebelum refactor](screenshots/after.jpeg)
 
-### Sesudah — refactor Clean Architecture selesai
+### Sesudah: refactor Clean Architecture selesai
 
 ![Dashboard sesudah refactor Clean Architecture](screenshots/after-refactor.jpeg)

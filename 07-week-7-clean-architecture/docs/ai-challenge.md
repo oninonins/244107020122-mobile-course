@@ -37,7 +37,7 @@ Kondisi nyata saat proposal dibuat, terverifikasi dengan `rg` (lihat
 
 ---
 
-## 2. Jawaban Tugas 1 — Struktur feature-first
+## 2. Jawaban Tugas 1: Struktur feature-first
 
 ```
 lib/
@@ -52,7 +52,7 @@ lib/
     └── notifications/{domain,data,presentation}
 ```
 
-Arah dependensi — satu arah, ke dalam:
+Arah dependensi, satu arah, ke dalam:
 
 ```
 presentation (widget, notifier, provider)
@@ -71,7 +71,7 @@ menyentuh tiga folder sekaligus.
 
 ---
 
-## 3. Jawaban Tugas 2 — Peta file lama
+## 3. Jawaban Tugas 2: Peta file lama
 
 Rinci perpecahan per baris ada di `refactor-map.md`. Ringkasnya:
 
@@ -91,12 +91,12 @@ Rinci perpecahan per baris ada di `refactor-map.md`. Ringkasnya:
 
 Yang **dihapus** bukan hanya dipindah: `lib/pages`, `lib/providers`, `lib/data`,
 dan `lib/messaging` seluruh foldernya dihapus. Kalau dibiarkan, grep sterilitas
-presentation tidak akan pernah nol — dan folder yang tidak pernah diimpor siapa
+presentation tidak akan pernah nol, dan folder yang tidak pernah diimpor siapa
 apa juga adalah kode mati.
 
 ---
 
-## 4. Jawaban Tugas 3 — Over-engineering
+## 4. Jawaban Tugas 3: Over-engineering
 
 ### Kriteria yang dipakai
 
@@ -110,9 +110,9 @@ kriteria itu sengaja tidak dibuat.
 
 | Use case | Aturan bisnis yang dipegangnya |
 |---|---|
-| `Login` | "email harus berformat email" dan "kata sandi minimal 6 karakter" — sebelumnya tertulis di dalam `login_page.dart` |
+| `Login` | "email harus berformat email" dan "kata sandi minimal 6 karakter", sebelumnya tertulis di dalam `login_page.dart` |
 | `GetAnnouncement` | Pintu masuk domain ke data pengumuman; dipanggil `AnnouncementPage` |
-| `RegisterDevice` | "hanya kirim token kalau sesi sudah ada" — sebelumnya tersebar di `main.dart:135` dan `auth_provider.dart:62` |
+| `RegisterDevice` | "hanya kirim token kalau sesi sudah ada", sebelumnya tersebar di `main.dart:135` dan `auth_provider.dart:62` |
 
 ### Ditolak, dengan alasan tertulis
 
@@ -125,7 +125,7 @@ kriteria itu sengaja tidak dibuat.
 | `publishedAt` di `Announcement` | Tidak ada UI yang menampilkan tanggal. Generality spekulatif. |
 | `RequestPermission` | Pembungkus satu panggilan; sudah mengembalikan record berisi `granted`. |
 | `SetTopicSubscription` | Pembungkus satu panggilan; sudah mengembalikan record berisi `subscribed`. |
-| Entity untuk `notifications` | Tidak ada data bisnis yang perlu digenggam — hanya token, topik, dan rute. Entity kosong akan jadi formalitas. |
+| Entity untuk `notifications` | Tidak ada data bisnis yang perlu digenggam, hanya token, topik, dan rute. Entity kosong akan jadi formalitas. |
 
 **Pola yang muncul:**ima yang ditolak semuanya bertumpu pada "tidak ada yang
 memakai" atau "tidak ada aturan". Yang Accepted semuanya punyaConsumer nyata dan
@@ -151,7 +151,7 @@ asli` yang memanggil **setiap** metode pada interface fake. Kalau ada satu yang
 
 ---
 
-## 5. Jawaban Tugas 4 — Wiring DI dengan Riverpod
+## 5. Jawaban Tugas 4: Wiring DI dengan Riverpod
 
 Tanpa package DI tambahan. Hanya Riverpod yang sudah dipakai sejak Minggu 3.
 
@@ -191,17 +191,17 @@ final deviceRegistrarProvider = Provider<DeviceRegistrar>((ref) {
 rg "Dio\(" lib/features/*/presentation
 ```
 
-benar-benar nol — bukan nol karena grep-nya longgar, tapi karena tidak ada satu
+benar-benar nol, bukan nol karena grep-nya longgar, tapi karena tidak ada satu
 pun `Dio(` di sana.
 
 ### Kenapa tidak `get_it`
 
 Riverpod sudah memberi tiga hal yang justru dibutuhkan di sini:
 
-1. **Testability** — `overrideWithValue` mengganti `SecureTokenStore()` dengan
+1. **Testability**, `overrideWithValue` mengganti `SecureTokenStore()` dengan
    `InMemoryTokenStore()` tanpa satu baris kode produksi yang berubah.
-2. **Siklus hidup** — `ref.onDispose` melepas router dan listener.
-3. **Cache** — provider dibaca berkali-kali menghasilkan instance yang sama.
+2. **Siklus hidup**, `ref.onDispose` melepas router dan listener.
+3. **Cache**, provider dibaca berkali-kali menghasilkan instance yang sama.
 
 Menambah `get_it` berarti menambah satu konsep DI kedua tanpa kebutuhan baru.
 
@@ -209,7 +209,7 @@ Menambah `get_it` berarti menambah satu konsep DI kedua tanpa kebutuhan baru.
 
 ## 6. AI Verification Checklist
 
-Enam pertanyaan dari codelab, dijawab dengan bukti — bukan dengan membaca
+Enam pertanyaan dari codelab, dijawab dengan bukti, bukan dengan membaca
 sekilas. Output `rg` lengkap ada di `verification-grep.md`.
 
 | # | Pertanyaan | Status | Bukti |
@@ -223,18 +223,18 @@ sekilas. Output `rg` lengkap ada di `verification-grep.md`.
 
 ### Dua temuan yang mengubah usulan
 
-**Temuan 1 — FCM tidak bisa diletakkan di `lib/core/`.**
+**Temuan 1, FCM tidak bisa diletakkan di `lib/core/`.**
 Usulan awal menaruh `push_service.dart` di `lib/core/messaging/` karena dipakai
 lintas fitur. Tapi grep #2 codelab menyisir `lib/core` secara rekursif, dan file
 itu mengimpor 4 package (`dio`, `firebase_messaging`, `flutter/foundation`,
 `flutter_local_notifications`). Memindahkannya ke sana **otomatis membuat grep #2
-tidak nol** — bertabrakan langsung dengan target "tiga grep nol".
+tidak nol**, bertabrakan langsung dengan target "tiga grep nol".
 
 Keputusan: FCM dijadikan fitur ketiga, `features/notifications/`. `lib/core/`
 tetap murni Dart, sesuai makna `core` di codelab ("Failure domain (murni
 Dart)").
 
-**Temuan 2 — ada dua `AuthFailure` yang bertabrakan.**
+**Temuan 2, ada dua `AuthFailure` yang bertabrakan.**
 
 ```
 lib/data/auth_repository.dart:11   class AuthFailure implements Exception
@@ -276,10 +276,10 @@ punya pemilik fitur, dan begitu sesi auth pindah tempat file itu ikut harus
 diubah.
 
 Untuk memutus siklus import, aturan "daftar ulang token setelah login" dipasang
-di `main.dart` lewat `deviceRegistrationOnLoginProvider` — bukan di dalam
+di `main.dart` lewat `deviceRegistrationOnLoginProvider`, bukan di dalam
 `AuthNotifier`. Kalau tidak, `auth` dan `notifications` saling mengimpor.
 
-**b. Grep "DI bocor" masih menemukan 4 baris — dan itu memang seharusnya.**
+**b. Grep "DI bocor" masih menemukan 4 baris, dan itu memang seharusnya.**
 
 ```
 push_providers.dart:32         return FirebasePushRepository();
@@ -289,7 +289,7 @@ auth_providers.dart:25          ... => MockAuthRepository()
 ```
 
 Keempatnya ada di file `providers/`, yang oleh codelab ditunjuk sebagai
-"notifier + DI" — satu-satunya tempat wiring. Yang terbukti nol adalah
+"notifier + DI — inilah satu-satunya tempat wiring". Yang terbukti nol adalah
 instansiasi di folder `pages/`: tidak ada widget yang `new Repository()` sendiri.
 
 **c. `Announcement.id` bertipe `String`.** Nilainya datang dari `data.route`

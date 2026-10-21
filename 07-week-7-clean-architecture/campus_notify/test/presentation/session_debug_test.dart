@@ -5,15 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Regresi untuk kartu "Debug token" di dashboard.
 ///
-/// `sessionDebugProvider` membaca secure storage. Pembacaan itu tidak otomatis
-/// ikut berubah ketika isi penyimpanan berubah, jadi `AuthNotifier` harus
-/// memberi tahu lewat `ref.invalidate`. Ada dua jalur yang mengubah penyimpanan:
-/// `login()` dan `logout()`. Keduanya diuji terpisah di sini.
+/// `sessionDebugProvider` membaca secure storage, dan pembacaan itu tidak
+/// otomatis berubah ketika isi penyimpanan berubah. `AuthNotifier` karena itu
+/// harus memanggil `ref.invalidate`. Ada dua jalur yang mengubah penyimpanan:
+/// `login()` dan `logout()`.
 ///
-/// Catatan dari review sejawat: versi pertama file ini menulis ke store secara
-/// langsung, bukan lewat `login()`. Akibatnya `ref.invalidate` di `login()`
-/// tidak teruji, dan test tetap hijau walau baris itu dihapus. Test pertama di
-/// bawah sekarang menempuh jalur `login()` supaya kesalahan itu tidak terulang.
+/// Versi pertama file ini menulis ke store langsung, bukan lewat `login()`,
+/// sehingga `ref.invalidate` di `login()` tidak teruji. Itu ditemukan reviewer
+/// sejawat pada PR #2, dan sekarang test menempuh jalur `login()`.
 void main() {
   ProviderContainer buatContainer(InMemoryTokenStore store) {
     final container = ProviderContainer(

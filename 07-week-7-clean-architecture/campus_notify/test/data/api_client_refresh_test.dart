@@ -9,12 +9,8 @@ import 'package:campus_notify/features/auth/domain/repositories/auth_repository.
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Adapter Dio tiruan: membalas 401 sekali, lalu 200 untuk request berikutnya.
-///
-/// Dipakai supaya jalur refresh bisa diuji tanpa server sungguhan.
+/// Adapter Dio tiruan: 401 sekali, lalu 200.
 class _UnauthorizedThenOkAdapter implements HttpClientAdapter {
-  _UnauthorizedThenOkAdapter();
-
   int calls = 0;
 
   @override
@@ -40,8 +36,11 @@ class _UnauthorizedThenOkAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
-/// Auth palsu yang selalu berhasil menukar refresh token.
-class _RefreshingAuth implements AuthRepository {
+/// Auth palsu. Kalau [failRefresh] benar, penukaran refresh ditolak.
+class _FakeAuth implements AuthRepository {
+  _FakeAuth({this.failRefresh = false});
+
+  final bool failRefresh;
   int refreshCalls = 0;
 
   @override
@@ -49,6 +48,7 @@ class _RefreshingAuth implements AuthRepository {
     String refreshToken,
   ) async {
     refreshCalls++;
+    if (failRefresh) return (session: null, failure: null);
     return (
       session: const AuthSession(
         access: 'access-hasil-refresh',
@@ -71,35 +71,45 @@ class _RefreshingAuth implements AuthRepository {
 }
 
 void main() {
-  test('token hasil refresh memberi tahu pembaca lain', () async {
-    final store = InMemoryTokenStore();
-    await store.save(access: 'access-lama', refresh: 'refresh-lama');
-
-    final auth = _RefreshingAuth();
+  ({Dio client, _UnauthorizedThenOkAdapter adapter}) siapkan({
+    required InMemoryTokenStore store,
+    required _FakeAuth auth,
+    void Function()? onRenewed,
+    void Function()? onExpired,
+  }) {
     final adapter = _UnauthorizedThenOkAdapter();
-    var renewed = 0;
-    var expired = 0;
-
-    final dio = Dio(BaseOptions(baseUrl: 'https://contoh.test'));
-    dio.httpClientAdapter = adapter;
-
+    final dio = Dio(BaseOptions(baseUrl: 'https://contoh.test'))
+      ..httpClientAdapter = adapter;
     final client = buildApiClient(
       store: store,
       auth: auth,
       inner: dio,
-      onSessionRenewed: () => renewed++,
-      onSessionExpired: () => expired++,
+      onSessionRenewed: onRenewed,
+      onSessionExpired: onExpired,
+    );
+    return (client: client, adapter: adapter);
+  }
+
+  test('token hasil refresh memberi tahu pembaca lain', () async {
+    final store = InMemoryTokenStore();
+    await store.save(access: 'access-lama', refresh: 'refresh-lama');
+
+    final auth = _FakeAuth();
+    var renewed = 0;
+    var expired = 0;
+    final s = siapkan(
+      store: store,
+      auth: auth,
+      onRenewed: () => renewed++,
+      onExpired: () => expired++,
     );
 
-    final response = await client.get<dynamic>('/devices');
+    final response = await s.client.get<dynamic>('/devices');
 
     expect(response.statusCode, 200);
-    expect(adapter.calls, 2, reason: 'satu request awal, satu retry');
+    expect(s.adapter.calls, 2, reason: 'satu request awal, satu retry');
     expect(auth.refreshCalls, 1);
     expect(await store.readAccess(), 'access-hasil-refresh');
-
-    // Inilah yang diperbaiki: tanpa callback ini, kartu debug tetap
-    // menampilkan 'access-lama'.
     expect(renewed, 1, reason: 'onSessionRenewed harus dipanggil sekali');
     expect(expired, 0, reason: 'sesi tidak boleh dianggap kedaluwarsa');
   });
@@ -110,23 +120,17 @@ void main() {
       final store = InMemoryTokenStore();
       await store.save(access: 'access-lama', refresh: 'refresh-lama');
 
-      final adapter = _UnauthorizedThenOkAdapter();
       var renewed = 0;
       var expired = 0;
-
-      final dio = Dio(BaseOptions(baseUrl: 'https://contoh.test'));
-      dio.httpClientAdapter = adapter;
-
-      final client = buildApiClient(
+      final s = siapkan(
         store: store,
-        auth: _FailingRefreshAuth(),
-        inner: dio,
-        onSessionRenewed: () => renewed++,
-        onSessionExpired: () => expired++,
+        auth: _FakeAuth(failRefresh: true),
+        onRenewed: () => renewed++,
+        onExpired: () => expired++,
       );
 
       await expectLater(
-        client.get<dynamic>('/devices'),
+        s.client.get<dynamic>('/devices'),
         throwsA(isA<DioException>()),
       );
 
@@ -135,22 +139,4 @@ void main() {
       expect(await store.readAccess(), isNull, reason: 'token dibersihkan');
     },
   );
-}
-
-/// Auth palsu yang menolak refresh.
-class _FailingRefreshAuth implements AuthRepository {
-  @override
-  Future<({AuthSession? session, Failure? failure})> refresh(
-    String refreshToken,
-  ) async {
-    return (session: null, failure: null);
-  }
-
-  @override
-  Future<({AuthSession? session, Failure? failure})> login({
-    required String email,
-    required String password,
-  }) async {
-    return (session: null, failure: null);
-  }
 }

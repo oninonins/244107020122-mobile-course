@@ -124,3 +124,99 @@ Catatan penting: temuan 4 sengaja **tidak** diperbaiki dengan `git rebase` atau
 `git commit --amend` pada commit lama. Riwayat sudah ter-push ke `origin/main`, dan
 menulis ulang history akan mengubah semua hash. Codelab meminta tabel
 sebelum/sesudah sebagai simulasi, bukan rewrite.
+
+---
+
+## Praktikum 2: Branch Kerja
+
+### Branch yang dibuat
+
+```
+main      865ad79   dilindungi, tidak disentuh langsung
+develop   865ad79   default branch, target semua PR
+```
+
+Perintah yang dipakai, sekali saja:
+
+```
+git checkout -b develop
+git push -u origin develop
+gh repo edit --default-branch develop
+```
+
+Setelah itu setiap pekerjaan bercabang dari `develop`, bukan dari `main`:
+
+| Branch | Tujuan | PR | Status |
+|---|---|---|---|
+| `chore/ci-pipeline` | CI | #4 | merged |
+| `fix/session-debug-stale` | Perbaikan bug | #2 | merged |
+| `docs/week-8-review` | Dokumen review | #3 | merged |
+
+Ketiganya sudah dihapus setelah merge, lokal dan remote.
+
+### Yang berubah dibanding audit
+
+| Temuan audit | Sebelum | Sesudah |
+|---|---|---|
+| Tidak ada `develop` | hanya `main` | `develop` ada, jadi default branch |
+| Tidak ada `feature/*` atau `fix/*` | tidak pernah dibuat | 3 branch kerja, semuanya via PR |
+| Commit langsung ke `main` | 22 commit | 0 commit baru di `main` |
+
+`main` masih di `865ad79`. Codelab menyebut `main` hanya berubah lewat release,
+jadi itu memang keadaan yang benar untuk paruh semester.
+
+---
+
+## Praktikum 3: Perbaiki Pesan Commit
+
+Tiga pesan terburuk ditulis ulang. **Riwayat tidak diubah**: `git log` tetap
+menampilkan pesan lama, karena commit itu sudah ter-push dan menulis ulang hash
+akan merusak riwayat bersama.
+
+### Sebelum dan sesudah
+
+| # | Commit | Pesan lama | Pesan baru | Alasan |
+|---|---|---|---|---|
+| 1 | `ff59979` | `week 2` | `feat(responsive): dashboard responsif dengan breakpoint dan layout adaptif` | `week 2` hanya menyebut minggu, bukan isi. Tidak ada tipe, tidak ada scope, dan tidak ada yang bisa direview dari judulnya. Isi commit sebenarnya: `responsive_dashboard` beserta README 345 baris dan screenshot. |
+| 2 | `fe32a76` | `praktikum & ai challenge` | `feat(notes): offline-first notes dengan SQLite dan AI challenge` | Dua pekerjaan dalam satu commit, dan `praktikum` bukan tipe. Isinya project `week5_offline_notes` lengkap: SQLite, README 109 baris, screenshot. |
+| 3 | `c5a2d8e` | `perbaiki readme` | `docs(readme): ganti tanda hubung panjang pada prosa dan heading` | `perbaiki` bukan tipe, tidak ada scope, dan tidak dijelaskan apa yang diperbaiki. Isinya 4 file dokumentasi, 100 tambahan dan 95 penghapusan, semuanya soal tanda baca. |
+
+### Yang membedakan
+
+Pesan lama hanya menjawab "kapan" atau "di folder mana". Pesan baru menjawab
+tiga hal sekaligus:
+
+1. **Apa** yang berubah (`dashboard responsif`, `offline-first notes`, `tanda
+   hubung`)
+2. **Di mana** (`responsive`, `notes`, `readme`)
+3. **Kenapa** ada di body, bukan di judul
+
+Perhatikan commit 1: judulnya `week 2`, padahal isinya 345 baris README plus satu
+project Flutter utuh. Reviewer tidak punya cara menebak itu dari judul.
+
+### Kesalahan yang sama, dua kali
+
+`c5a2d8e` dan `0c897c2` sama-sama buatan sendiri pada minggu yang sama dengan
+kesalahan serupa: menyebut aktivitas, bukan perubahan. Itu bukan kelalaian
+sekali, melainkan kebiasaan. Karena itu aturan yang dipakai sekarang:
+
+| Aturan | Contoh benar | Contoh salah |
+|---|---|---|
+| Selalu ada tipe | `fix(auth): ...` | `perbaiki readme` |
+| Scope menyebut area kode | `feat(notes): ...` | `week 5` |
+| Judul menjelaskan hasil, bukan aktivitas | `test(auth): uji alur login A, logout, login B` | `add test` |
+| Satu commit satu perubahan logis | `ci: jalankan analyze dan test` | `praktikum & ai challenge` |
+
+### Bukti aturan itu dipakai
+
+Tiga commit terakhir di `develop` semuanya mengikuti aturan di atas:
+
+```
+573400d Merge pull request #2 from oninonins/fix/session-debug-stale
+c6ed5a5 test(auth): rapatkan test dan kembalikan komentar yang tidak terkait
+8c098c2 test(auth): uji alur login A, logout, login B pada kartu debug
+```
+
+Enam commit week 8 seluruhnya bertipe `docs`, `fix`, `test`, `ci`, atau `chore`,
+dengan scope yang menyebut area kode.
+

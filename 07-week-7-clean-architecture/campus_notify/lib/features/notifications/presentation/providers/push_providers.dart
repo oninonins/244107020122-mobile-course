@@ -52,6 +52,11 @@ final deviceRegistrarProvider = Provider<DeviceRegistrar>((ref) {
     auth: ref.watch(authRepositoryProvider),
     readToken: () => ref.read(_firebasePushProvider).currentToken,
     onSessionExpired: () => ref.read(authStateProvider.notifier).logout(),
+    // Secure storage punya dua penulis: `AuthNotifier.login()` dan interceptor
+    // refresh di `api_client.dart`. Keduanya harus memberi tahu kartu debug,
+    // kalau tidak kartu itu menampilkan access token lama setelah token
+    // diperbarui diam-diam saat menerima 401.
+    onSessionRenewed: () => ref.invalidate(sessionDebugProvider),
   );
 });
 

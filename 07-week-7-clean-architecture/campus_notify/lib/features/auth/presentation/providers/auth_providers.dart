@@ -22,7 +22,9 @@ final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());
 
 /// Sumber token. Mengganti provider ini dengan implementasi Firebase Auth
 /// adalah satu-satunya perubahan yang diperlukan untuk auth sungguhan.
-final authRepositoryProvider = Provider<AuthRepository>((ref) => MockAuthRepository());
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => MockAuthRepository(),
+);
 
 /// Use case menerima abstraksi, bukan implementasi.
 final loginProvider = Provider<Login>((ref) {
@@ -32,7 +34,9 @@ final loginProvider = Provider<Login>((ref) {
 /// `true` bila access token tersimpan, yaitu guard route mengizinkan pengguna
 /// masuk. Dijalankan saat startup supaya pengguna yang kembali tidak diminta
 /// login lagi.
-final authStateProvider = AsyncNotifierProvider<AuthNotifier, bool>(AuthNotifier.new);
+final authStateProvider = AsyncNotifierProvider<AuthNotifier, bool>(
+  AuthNotifier.new,
+);
 
 class AuthNotifier extends AsyncNotifier<bool> {
   @override
@@ -53,18 +57,23 @@ class AuthNotifier extends AsyncNotifier<bool> {
   ) async {
     state = const AsyncLoading();
 
-    final result = await ref.read(loginProvider).call(email: email, password: password);
+    final result = await ref
+        .read(loginProvider)
+        .call(email: email, password: password);
     if (result.session == null) {
       state = const AsyncData(false);
       return (session: null, failure: result.failure);
     }
 
-    await ref.read(tokenStoreProvider).save(
-          access: result.session!.access,
-          refresh: result.session!.refresh,
-        );
+    await ref
+        .read(tokenStoreProvider)
+        .save(access: result.session!.access, refresh: result.session!.refresh);
 
     state = const AsyncData(true);
+
+    // Isi secure storage baru berubah. Kartu Debug token membaca penyimpanan
+    // itu lewat provider terpisah, jadi harus dihitung ulang di sini.
+    ref.invalidate(sessionDebugProvider);
 
     // Token FCM TIDAK didaftarkan di sini. Aturan "daftar ulang setelah login"
     // milik fitur notifications, dan memanggilnya dari sini akan membuat
@@ -81,6 +90,8 @@ class AuthNotifier extends AsyncNotifier<bool> {
   /// over-engineering — lihat `docs/ai-challenge.md` tabel keputusan.
   Future<void> logout() async {
     await ref.read(tokenStoreProvider).clear();
+    // Tanpa ini kartu Debug token tetap menampilkan sesi yang baru dihapus.
+    ref.invalidate(sessionDebugProvider);
     ref.invalidateSelf();
   }
 }
@@ -101,6 +112,16 @@ class SessionDebug {
   final String? email;
 }
 
+/// Dibaca ulang setiap sesi berganti.
+///
+/// Provider ini membaca secure storage, dan pembacaan itu tidak otomatis ikut
+/// berubah ketika isi penyimpanan berubah. Karena itu `AuthNotifier` memanggil
+/// `ref.invalidate(sessionDebugProvider)` pada login berhasil dan pada logout.
+///
+/// Tanpa itu hasil pembacaan pertama bertahan selamanya, sehingga setelah
+/// logout lalu login dengan akun lain kartu Debug token masih menampilkan token
+/// sesi sebelumnya. Perilaku itu dikunci oleh
+/// `test/presentation/session_debug_test.dart`.
 final sessionDebugProvider = FutureProvider<SessionDebug>((ref) async {
   final store = ref.watch(tokenStoreProvider);
   final access = await store.readAccess();

@@ -165,6 +165,23 @@ Ketiganya sudah dihapus setelah merge, lokal dan remote.
 `main` masih di `865ad79`. Codelab menyebut `main` hanya berubah lewat release,
 jadi itu memang keadaan yang benar untuk paruh semester.
 
+### Penyimpangan yang disengaja
+
+Satu commit dokumentasi masuk langsung ke `develop` tanpa PR:
+
+```
+dbbf638  docs(review): catat praktikum 2 dan 3 pada review checklist
+```
+
+Alasannya: PR #6 sudah dibuka untuk commit itu, tetapi isinya murni satu file
+dokumentasi dan tidak menyentuh kode. Daripada menambah satu PR lagi untuk
+pekerjaan yang sama, commit itu dipindahkan ke `develop` dengan fast-forward,
+sehingga PR #6 tertutup otomatis sebagai merged.
+
+Aturan "`develop` tidak disentuh langsung" tetap berlaku untuk perubahan kode.
+Penyimpangan ini dicatat supaya tidak terbaca sebagai inkonsistensi saat
+dibandingkan dengan temuan audit nomor 3.
+
 ---
 
 ## Praktikum 3: Perbaiki Pesan Commit

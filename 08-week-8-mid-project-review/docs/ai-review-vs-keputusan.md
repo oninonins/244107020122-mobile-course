@@ -1,18 +1,14 @@
 # AI Review vs Keputusan
 
-Dokumen wajib Minggu 8. Berisi temuan reviewer, bukti, dan keputusan final.
-Codelab meminta minimal 2 temuan terbukti benar dengan bukti, dan minimal 1
-temuan ditolak dengan alasan tertulis.
-
-## Konteks
+Dokumen wajib Minggu 8. Berisi prompt review, lima temuan, bukti, dan keputusan
+final.
 
 | | |
 |---|---|
-| PR | #2, `fix/session-debug-stale` ke `develop` |
-| Issue | #1, kartu Debug token menampilkan sesi lama |
-| Reviewer sejawat | Zuhdiaja (Approve, 2 temuan) |
-| Reviewer AI | sesi pengembangan, temuan diverifikasi manual |
-| Commit awal yang direview | `1dd709c` |
+| Cakupan review | seluruh `07-week-7-clean-architecture/campus_notify` |
+| Commit yang direview | `44a5e48` (ujung `develop`) |
+| Stack | feature-first Clean Architecture, Riverpod, GoRouter, Dio, Firebase |
+| Mesin | Flutter 3.47.5, Dart 3.13.4 |
 
 ## Prompt yang diberikan
 
@@ -25,140 +21,334 @@ Berikan 5 temuan teratas + level (blocker/saran)
 + alasan + usulan potongan kode perbaikan.
 ```
 
-## Ringkasan hasil
+## Ringkasan lima temuan
 
-| # | Temuan | Sumber | Status | Bukti |
+| # | Temuan | Level | Keputusan | Status |
 |---|---|---|---|---|
-| 1 | Interceptor 401 menyimpan token hasil refresh tanpa memberi tahu pembaca lain | AI dan sejawat | Diterima, diperbaiki | Test `api_client_refresh_test.dart` |
-| 2 | Test hanya menguji jalur `logout()`, bukan `login()` | Sejawat | Diterima, diperbaiki | Eksperimen hapus `invalidate` |
-| 3 | `invalidate` di `logout()` seharusnya cukup karena `invalidateSelf()` sudah memicu rebuild | AI | **Ditolak** | Lihat bagian penolakan |
-| 4 | `auth_providers.dart` dirapikan `dart format` sehingga diff memuat perubahan layout | AI | Diterima, dicatat | Diff 39 baris untuk perbaikan 4 baris |
-| 5 | Komentar `invalidate` terlalu panjang | AI | **Ditolak** | Lihat bagian penolakan |
+| 1 | `AnnouncementModel.fromJson` melempar `TypeError` untuk id bertipe `String` | Blocker | Diterima | **Belum diperbaiki**, dicatat di issue #7 |
+| 2 | Tujuh import lintas fitur, termasuk `presentation` ke `presentation` | Blocker | Diterima sebagian | Ditunda, dicatat |
+| 3 | `_toggleTopic` mengabaikan `failure` dan menampilkan pesan terbalik | Blocker | Diterima | Dicatat |
+| 4 | Ternary mati di `_toggleTopic` | Saran | Diterima | Dicatat |
+| 5 | `invalidate` tersebar di tiga titik | Saran | Diterima | Sudah ada issue #5 |
+
+Empat usulan AI ditolak dengan alasan tertulis di bagian akhir.
 
 ---
 
-## Temuan 1: token hasil refresh tidak memberi tahu pembaca lain
+## Temuan 1: `fromJson` gagal untuk id bertipe String
 
-**Klaim.** `lib/features/auth/data/api_client.dart` menyimpan sesi baru setelah
-401, tetapi tidak memberi tahu `sessionDebugProvider`. Kartu Debug token tetap
-menampilkan access token lama setelah token diperbarui diam-diam.
+**Level: Blocker.**
 
-**Verifikasi.** Dicari semua tempat yang menulis ke secure storage:
+### Klaim
 
-```
-$ rg -n "\.save\(" lib
-lib\features\auth\presentation\providers\auth_providers.dart:70
-lib\features\auth\data\api_client.dart:59
-```
+`AnnouncementModel.fromJson` memakai `as num?` untuk `id`. Cast itu melempar
+`TypeError` kalau nilainya `String`, bukan mengembalikan `null`. Karena seed
+repository memakai id `String`, seluruh jalur baca pengumuman gagal.
 
-Dua penulis, tetapi hanya jalur login yang memanggil
-`ref.invalidate(sessionDebugProvider)`. Jalur interceptor tidak. Klaim terbukti.
+### Bukti
 
-**Keputusan.** Diterima. Perbaikan: `buildApiClient()` menerima callback
-`onSessionRenewed` yang dipanggil tepat setelah `store.save()` berhasil.
-Wiring-nya di `push_providers.dart`, karena di situlah `buildDeviceRegistrar()`
-dipanggil.
+Kode yang bermasalah, `announcement_model.dart:16`:
 
-**Bukti setelah perbaikan.** `test/data/api_client_refresh_test.dart` memakai
-`HttpClientAdapter` tiruan yang membalas 401 sekali lalu 200:
-
-```
-flutter test test/data/api_client_refresh_test.dart
-00:00 +2: All tests passed!
+```dart
+id: (json['id'] as num?)?.toString() ?? (json['id'] as String?) ?? '',
 ```
 
-Test memeriksa tiga hal: `adapter.calls == 2` (satu request awal, satu retry),
-`auth.refreshCalls == 1`, dan `renewed == 1` (callback terpanggil).
+Seed di `mock_announcement_repository.dart:45,50,55` memakai `String`:
+
+```dart
+'id': '1',
+```
+
+Reproduksi dengan test sementara, hasilnya bukan asersi gagal melainkan exception:
+
+```
+00:00 +0 -1: fromJson dengan id String [E]
+  type 'String' is not a subtype of type 'num?' in type cast
+  package:campus_notify/features/announcements/data/models/announcement_model.dart 16:23
+    new AnnouncementModel.fromJson
+
+00:00 +0 -2: repository seed benar-benar bisa dibaca [E]
+  type 'String' is not a subtype of type 'num?' in type cast
+  package:campus_notify/features/announcements/data/models/announcement_model.dart 16:23
+    new AnnouncementModel.fromJson
+  package:campus_notify/features/announcements/data/repositories/mock_announcement_repository.dart 37:39
+    MockAnnouncementRepository.fetchById
+```
+
+### Kenapa test yang ada tidak menangkapnya
+
+`test/widget_test.dart:92` memeriksa:
+
+```dart
+expect(find.text('Pengumuman #3'), findsOneWidget);
+```
+
+`'Pengumuman #3'` adalah judul `AppBar` di `announcement_page.dart:28`, yang
+dirender di semua state termasuk `error`. Jadi test itu lulus meski isi halaman
+gagal dimuat. Tidak ada satu pun test yang memanggil `AnnouncementModel.fromJson`
+langsung.
+
+### Dampak
+
+Kartu "Pengumuman Campus" di dashboard membuka halaman yang menampilkan pesan
+error, bukan judul dan isi pengumuman. Ini terlihat saat demo.
+
+### Usulan perbaikan
+
+```dart
+static String _idOf(Object? value) => value?.toString() ?? '';
+
+factory AnnouncementModel.fromJson(Map<String, Object?> json) {
+  return AnnouncementModel(
+    id: _idOf(json['id']),
+    title: (json['title'] as String?) ?? '',
+    body: (json['body'] as String?) ?? '',
+  );
+}
+```
+
+### Keputusan
+
+**Diterima sebagai temuan, tetapi perbaikannya belum dikerjakan** atas keputusan
+pemilik project. Dicatat di issue #7 supaya tidak hilang.
+
+Alasan penundaan: perbaikan ini menyentuh `data`, dan pada saat review
+dikerjakan prioritasnya adalah menutup PR #2 dan menyelesaikan dokumen Week 8.
+Risikonya dicatat terbuka di sini, bukan disembunyikan.
 
 ---
 
-## Temuan 2: test tidak menguji jalur `login()`
+## Temuan 2: import lintas fitur
 
-**Klaim reviewer.** Test pertama menulis ke store secara langsung, bukan lewat
-`login()`. Jadi `ref.invalidate` di `AuthNotifier.login()` tidak teruji. Hapus
-baris itu, test tetap hijau.
+**Level: Blocker.**
 
-**Verifikasi.** Klaim diuji dengan eksperimen, bukan dibaca sekilas. Baris
-`ref.invalidate(sessionDebugProvider)` di `login()` diganti komentar, lalu test
-dijalankan:
+### Klaim
 
-```
-flutter test test/presentation/session_debug_test.dart
-00:00 +2: All tests passed!
-```
+Ada import dari satu fitur ke fitur lain, termasuk dari `presentation` ke
+`presentation`. Codelab Minggu 7 menyebut fitur berkomunikasi lewat rute, bukan
+lewat import widget.
 
-Test **tetap lulus**. Klaim terbukti: test lama hanya menempuh jalur `logout()`,
-karena `logout()` memanggil `invalidateSelf()` yang memicu rebuild.
-
-**Keputusan.** Diterima. Test pertama diubah supaya login lewat
-`AuthNotifier.login()`, lalu login lagi dengan akun berbeda tanpa logout.
-
-**Bukti setelah perbaikan.** Eksperimen yang sama diulang pada test baru:
+### Bukti
 
 ```
-flutter test test/presentation/session_debug_test.dart
-  Expected: 'lain@polinema.ac.id'
-    Actual: 'mhs@polinema.ac.id'
-  tanpa invalidate di login(), nilai cache sesi pertama bertahan
+$ rg -n "^import '.*(auth|announcements|notifications)/" lib/features
+
+notifications/domain/usecases/register_device.dart:2   ../../../auth/domain/repositories/token_store.dart
+notifications/data/dio_device_registrar.dart:4         ../../auth/data/api_client.dart
+notifications/data/dio_device_registrar.dart:5         ../../auth/domain/repositories/auth_repository.dart
+notifications/data/dio_device_registrar.dart:6         ../../auth/domain/repositories/token_store.dart
+notifications/presentation/providers/push_providers.dart:9  ../../../auth/presentation/providers/auth_providers.dart
+announcements/presentation/pages/home_page.dart:9      ../../../auth/presentation/providers/auth_providers.dart
+announcements/presentation/pages/home_page.dart:10     ../../../notifications/presentation/providers/push_providers.dart
 ```
 
-Sekarang test **gagal** ketika `invalidate` dihapus. Artinya jalur itu benar
-terkunci. Setelah baris dikembalikan, seluruh test hijau.
+Tujuh import di empat file. Satu di antaranya salah hitung kalau grep dijalankan
+tanpa hati-hati: `firebase_push_repository.dart:5` cocok karena nama package
+`flutter_local_notifications`, bukan import lintas fitur.
 
-Catatan teknis: asersi awal membandingkan `maskedAccess`, dan itu keliru karena
-token mock berbagi prefix `mock-access.` sehingga hasil masking-nya identik.
-Pembanding yang andal adalah `email`, yang berasal dari refresh token.
+### Penilaian
+
+Tiga di antaranya masih bisa dipertahankan:
+
+| Import | Alasan |
+|---|---|
+| `register_device.dart` ke `auth/domain/token_store.dart` | Domain ke domain. `POST /devices` memang butuh sesi |
+| `dio_device_registrar.dart` ke `auth/domain/*` | Data ke domain, arah yang benar |
+| `dio_device_registrar.dart` ke `auth/data/api_client.dart` | Data ke data, dan Dio hanya hidup di satu tempat |
+
+Empat sisanya bermasalah karena `presentation` mengimpor `presentation`:
+
+| Import | Masalah |
+|---|---|
+| `push_providers.dart` ke `auth_providers.dart` | Provider notifikasi membaca provider auth |
+| `home_page.dart` ke `auth_providers.dart` | Halaman pengumuman membaca state auth |
+| `home_page.dart` ke `push_providers.dart` | Halaman pengumuman membaca state notifikasi |
+
+### Usulan AI
+
+Pindahkan `sessionDebugProvider`, `tokenStoreProvider`, dan aksi logout ke
+`lib/core/providers.dart`, lalu semua fitur membaca dari sana.
+
+### Keputusan
+
+**Ditolak, dengan alasan.** Usulan itu memindahkan provider yang bergantung pada
+`TokenStore` dan `AuthNotifier` ke `lib/core/`. `core/` di project ini
+diperuntukkan bagi kode yang tidak punya pemilik fitur, dan grep sterilitas
+Minggu 7 mensyaratkan `lib/core` bebas import Flutter. `auth_providers.dart`
+mengimpor `flutter_riverpod`, jadi memindahkannya ke `core/` akan membuat grep
+itu tidak nol.
+
+Temuan tetap dicatat sebagai utang arsitektur. Yang disepakati: satu tautan
+`notifications` ke `auth` dibiarkan karena `POST /devices` butuh header
+`Authorization`, sementara `home_page.dart` yang mengimpor dua fitur sekaligus
+perlu dipecah saat ada waktu.
 
 ---
 
-## Temuan 3 ditolak: `invalidate` di `logout()` dianggap berlebihan
+## Temuan 3: `_toggleTopic` mengabaikan kegagalan
 
-**Klaim.** `logout()` sudah memanggil `ref.invalidateSelf()`, yang membangun
-ulang `authStateProvider`. Karena itu `ref.invalidate(sessionDebugProvider)`
-dianggap tidak perlu.
+**Level: Blocker.**
 
-**Alasan penolakan.** `sessionDebugProvider` tidak membaca `authStateProvider`.
-Ia hanya membaca `tokenStoreProvider`, dan `tokenStoreProvider` adalah
-`Provider<TokenStore>` biasa yang tidak pernah berubah nilainya. Membangun ulang
-`authStateProvider` karena itu tidak menyentuh `sessionDebugProvider` sama
-sekali.
+### Klaim
 
-Diuji dengan menghapus baris tersebut: `test/presentation/session_debug_test.dart`
-gagal pada kasus logout, dengan `Actual: 'sesi-pertama...'` padahal yang
-diharapkan `(kosong)`.
+`_toggleTopic` memakai `result.subscribed` untuk menentukan pesan SnackBar, tetapi
+tidak pernah memeriksa `result.failure`. Kalau pemanggilan gagal, nilai
+`subscribed` kembali ke nilai lama, sehingga pesan yang muncul adalah kebalikan
+dari yang diminta pengguna, tanpa pemberitahuan error.
 
-Kesimpulan: klaim ini salah, dan menghapus baris itu akan mengembalikan bug.
-Baris dipertahankan.
+### Bukti
+
+`home_page.dart:97-111`:
+
+```dart
+final subscribe = !_topicSubscribed;
+final result = await ref
+    .read(topicSubscriptionProvider)
+    .setSubscribed(value: subscribe);
+if (!mounted) return;
+setState(() => _topicSubscribed = result.subscribed);
+ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text(
+      result.subscribed
+          ? 'Berlangganan topik ${result.subscribed ? topicName : ''}'.trim()
+          : 'Berhenti berlangganan topik $topicName',
+    ),
+  ),
+);
+```
+
+`FirebasePushRepository.setSubscribed` mengembalikan
+`(subscribed: _topicSubscribed, failure: LocalFailure(...))` saat gagal, dan
+`_topicSubscribed` tetap bernilai lama.
+
+Skenario: pengguna menekan "Berlangganan topik" saat perangkat offline.
+`subscribe` bernilai `true`, pemanggilan gagal, `result.subscribed` tetap
+`false`, lalu SnackBar berbunyi **"Berhenti berlangganan topik
+pengumuman-kampus"**. Pesan itu kebalikan dari tindakan pengguna, dan tidak ada
+informasi bahwa permintaan gagal.
+
+### Usulan perbaikan
+
+```dart
+if (result.failure != null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(result.failure!.message)),
+  );
+  return;
+}
+setState(() => _topicSubscribed = result.subscribed);
+ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text(
+      result.subscribed
+          ? 'Berlangganan topik $topicName'
+          : 'Berhenti berlangganan topik $topicName',
+    ),
+  ),
+);
+```
+
+### Keputusan
+
+Diterima. Belum dikerjakan pada commit ini karena berada di `presentation` dan
+menyentuh perilaku; perlu test widget sendiri. Dicatat bersama temuan 1.
 
 ---
 
-## Temuan 4 diterima: diff memuat perubahan format
+## Temuan 4: ternary mati di `_toggleTopic`
 
-**Klaim.** `dart format` pada file yang disentuh ikut merapikan baris lain,
-sehingga diff 39 baris untuk perbaikan yang sebenarnya 4 baris.
+**Level: Saran.**
 
-**Verifikasi.** `git diff --stat` menunjukkan 30 tambahan dan 9 penghapusan,
-sementara baris logika yang berubah hanya `ref.invalidate` di dua tempat.
+### Klaim
 
-**Keputusan.** Diterima dan dicatat di deskripsi PR, tetapi tidak dikembalikan.
-Alasannya: file itu memang belum pernah diformat, dan mengembalikan formatnya
-berarti PR tetap tidak lolos `dart format --set-exit-if-changed`.
+`'Berlangganan topik ${result.subscribed ? topicName : ''}'.trim()` berada di
+dalam cabang `result.subscribed` yang sudah bernilai benar. Jadi ternary itu
+selalu menghasilkan `topicName`, dan `.trim()` tidak pernah memangkas apa pun.
 
-Perapian 28 file lain **tidak** dimasukkan ke PR ini. Saat dijalankan,
-`dart format` menyentuh 30 file; 28 di antaranya dikembalikan dengan
-`git checkout` supaya PR tetap di bawah 300 baris.
+### Bukti
+
+`home_page.dart:106-109`. Di cabang `result.subscribed == true`, kondisi
+`result.subscribed ? topicName : ''` pasti `topicName`.
+
+### Keputusan
+
+Diterima. Cukup ditulis `'Berlangganan topik $topicName'`. Digabung dengan
+perbaikan temuan 3, karena berada di ekspresi yang sama.
 
 ---
 
-## Temuan 5 ditolak: komentar dianggap terlalu panjang
+## Temuan 5: `invalidate` tersebar di tiga titik
 
-**Klaim.** Komentar penjelasan `invalidate` sepanjang 6 baris dianggap berlebihan
-untuk kode 1 baris.
+**Level: Saran.**
 
-**Alasan penolakan.** Komentar itu menjelaskan **mengapa**, bukan **apa**.
-Tanpa penjelasan tersebut, `ref.invalidate(sessionDebugProvider)` terlihat
-seperti baris yang bisa dihapus tanpa akibat, dan temuan 3 membuktikan bahwa
-kesimpulan itu memang mudah diambil. Komentar dipertahankan tanpa perubahan.
+### Klaim
+
+`sessionDebugProvider` sekarang di-invalidate dari tiga tempat. Penulis keempat
+ke secure storage harus ingat menambahkannya, dan kalau lupa, kartu Debug token
+menampilkan data basi tanpa error apa pun.
+
+### Bukti
+
+```
+auth_providers.dart:76              ref.invalidate(sessionDebugProvider);   // login
+auth_providers.dart:94              ref.invalidate(sessionDebugProvider);   // logout
+push_providers.dart:59              onSessionRenewed: () => ref.invalidate(...)
+```
+
+### Keputusan
+
+Diterima, dan sudah dicatat di issue #5 sebelum review ini. Usulan provider
+revisi belum dikerjakan. Sama seperti temuan 2, ini utang arsitektur yang
+diketahui, bukan kelalaian yang tidak disadari.
+
+---
+
+## Usulan AI yang ditolak
+
+### Ditolak 1: pindahkan `api_errors.dart` ke `lib/core/`
+
+**Usulan.** Fungsi pemetaan error dianggap util umum, jadi layak masuk `core/`.
+
+**Alasan penolakan.** `api_errors.dart` mengimpor `package:dio`. Grep sterilitas
+Minggu 7 mensyaratkan `lib/core` bebas import Flutter, Dio, SQLite, dan Firebase.
+Memindahkannya ke `core/` akan membuat grep itu tidak nol.
+
+```
+$ rg "import 'package:flutter|import 'package:dio" lib/core
+(sebelum: nol hasil)
+```
+
+### Ditolak 2: ganti record dengan `fpdart` `Either<Failure, T>`
+
+**Usulan.** Record `({T? value, Failure? failure})` dianggap kurang ekspresif
+dibanding `Either`.
+
+**Alasan penolakan.** Codelab Minggu 7 menyebut pola kontraknya sama dan record
+bawaan Dart sudah cukup. Menambah dependency untuk mengganti tipe bawaan
+menambah satu hal yang harus dipelajari tim tanpa mengubah perilaku. Kalau nanti
+butuh `map`/`fold` berantai, baru dipertimbangkan.
+
+### Ditolak 3: ubah `Announcement.id` menjadi `int`
+
+**Usulan.** Id sebaiknya `int` karena bentuknya angka.
+
+**Alasan penolakan.** Nilai id berasal dari `data.route` payload FCM yang selalu
+berupa teks, dan `announcement_page.dart` menerima `String` dari
+`state.pathParameters`. Mengubahnya ke `int` menambah konversi di dua tempat
+tanpa ada konsumen yang membutuhkannya. Perbaikan yang tepat adalah temuan 1,
+yaitu membuat `fromJson` menerima kedua bentuk.
+
+### Ditolak 4: rapikan panjang baris dan `prefer_const`
+
+**Usulan.** Beberapa baris melewati 80 kolom, dan beberapa widget bisa memakai
+`const`.
+
+**Alasan penolakan.** Prompt meminta mengabaikan style, dan urusan itu sudah
+ditangani `dart format` plus CI. Menuliskannya sebagai temuan review hanya
+menambah kebisingan. Sudah dijalankan: 27 file diformat, dan langkah
+`dart format --set-exit-if-changed` ditambahkan ke CI supaya tidak kembali
+kotor.
 
 ---
 
@@ -166,26 +356,42 @@ kesimpulan itu memang mudah diambil. Komentar dipertahankan tanpa perubahan.
 
 | Butir | Status | Bukti |
 |---|---|---|
-| Temuan benar-benar ada, dibuktikan grep/test/reproduksi | Ya | Temuan 1 lewat `rg`, temuan 2 lewat eksperimen |
-| Usulan tidak melanggar dependency rule | Ya | Perubahan hanya di `presentation` dan `data`; `domain` tidak disentuh |
-| AI hanya nitpick style | Sebagian | Temuan 4 memang style, dan itu diakui serta dicatat |
-| Minimal 2 temuan terbukti benar | Ya | Temuan 1 dan 2 |
-| Minimal 1 temuan ditolak dengan alasan tertulis | Ya | Temuan 3 dan 5 |
+| Temuan benar-benar ada, dibuktikan grep, test gagal, atau reproduksi | Ya | Temuan 1 lewat test reproduksi, temuan 2 dan 5 lewat `rg`, temuan 3 lewat penelusuran jalur `setSubscribed` |
+| Usulan tidak melanggar dependency rule | Ya | Usulan yang melanggar (pindahkan `api_errors` ke `core`) ditolak |
+| AI hanya nitpick style | Sebagian | Usulan style ditolak dan diserahkan ke formatter/CI |
+| Minimal 2 temuan terbukti benar | Ya | Temuan 1 dan 3, keduanya dengan bukti keras |
+| Minimal 1 temuan ditolak dengan alasan tertulis | Ya | Empat usulan ditolak, semuanya beralasan |
+| Keputusan final dan alasan teknis terdokumentasi | Ya | Bagian "Keputusan" pada tiap temuan |
 
-## Verifikasi dependency rule setelah perubahan
+## Bukti mesin setelah perubahan
 
 ```
-rg "import 'package:flutter|import 'package:dio|import 'package:sqflite|import 'package:firebase" \
-   lib/features/auth/domain lib/features/announcements/domain lib/features/notifications/domain lib/core
--> nol hasil
-
 flutter analyze -> No issues found!
-flutter test    -> All tests passed! (47 test)
+flutter test    -> All tests passed! (48 test)
+dart format     -> 36 file, 0 changed
+CI              -> format + analyze + test, hijau
 ```
 
-## Kesimpulan
+## Review sejawat PR #2
 
-Dua temuan nyata masuk ke kode. Satu di antaranya (temuan 2) tidak akan
-ditemukan tanpa review sejawat, karena reviewer AI sendiri sempat menganggap
-test yang ada sudah memadai. Satu temuan ditolak karena salah secara teknis,
-dan penolakan itu dibuktikan dengan test, bukan dengan argumen.
+Sebagai pembanding, review sejawat pada PR #2 menemukan dua hal yang tidak
+ditemukan reviewer AI:
+
+| Temuan | Sumber | Status |
+|---|---|---|
+| Interceptor 401 menyimpan token tanpa memberi tahu pembaca lain | AI dan sejawat | Diperbaiki |
+| Test hanya menguji jalur `logout()`, bukan `login()` | **Sejawat saja** | Diperbaiki |
+
+Temuan kedua penting: reviewer AI menganggap test yang ada sudah memadai, dan
+hanya review manusia yang mempertanyakannya. Setelah dibuktikan dengan
+menghapus `ref.invalidate` di `login()`, test lama memang tetap hijau.
+
+## Catatan untuk demo
+
+Tiga hal yang perlu bisa dijelaskan tanpa membuka dokumen ini:
+
+1. Temuan 1 nyata dan bisa direproduksi dengan satu baris:
+   `AnnouncementModel.fromJson({'id': '3'})` melempar `TypeError`.
+2. Temuan 2 sebagian ditolak karena `core/` harus bebas Dio. Yang tersisa adalah
+   utang arsitektur, bukan temuan palsu.
+3. Temuan 3 bukan sekadar soal pesan: pesannya kebalikan dari tindakan pengguna.

@@ -51,7 +51,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (!mounted) return;
       setState(() {
         _fcmToken = maskToken(token);
-        _tokenUpdatedAt = formatClock(ref.read(pushTokenSourceProvider).tokenUpdatedAt);
+        _tokenUpdatedAt = formatClock(
+          ref.read(pushTokenSourceProvider).tokenUpdatedAt,
+        );
       });
     });
   }
@@ -75,7 +77,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _requestPermission() async {
     final result = await ref.read(pushTokenSourceProvider).requestPermission();
     if (!mounted) return;
-    setState(() => _permissionStatus = result.granted ? 'Izin diberikan' : 'Izin ditolak');
+    setState(
+      () => _permissionStatus = result.granted
+          ? 'Izin diberikan'
+          : 'Izin ditolak',
+    );
   }
 
   Future<void> _registerDevice() async {
@@ -89,14 +95,17 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// nilai atau tagihan harus dikirim ke token perangkat, bukan ke topik.
   Future<void> _toggleTopic() async {
     final subscribe = !_topicSubscribed;
-    final result = await ref.read(topicSubscriptionProvider).setSubscribed(value: subscribe);
+    final result = await ref
+        .read(topicSubscriptionProvider)
+        .setSubscribed(value: subscribe);
     if (!mounted) return;
     setState(() => _topicSubscribed = result.subscribed);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           result.subscribed
-              ? 'Berlangganan topik ${result.subscribed ? topicName : ''}'.trim()
+              ? 'Berlangganan topik ${result.subscribed ? topicName : ''}'
+                    .trim()
               : 'Berhenti berlangganan topik $topicName',
         ),
       ),
@@ -161,8 +170,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
-                  _TokenRow(label: 'Access', value: session.value?.maskedAccess),
-                  _TokenRow(label: 'Refresh', value: session.value?.maskedRefresh),
+                  _TokenRow(
+                    label: 'Access',
+                    value: session.value?.maskedAccess,
+                  ),
+                  _TokenRow(
+                    label: 'Refresh',
+                    value: session.value?.maskedRefresh,
+                  ),
                 ],
               ),
             ),

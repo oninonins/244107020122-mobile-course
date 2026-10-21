@@ -31,7 +31,10 @@ void main() {
   test('sesi aktif -> token dikirim ke backend', () async {
     await store.save(access: 'mock-access', refresh: 'mock-refresh');
 
-    final result = await RegisterDevice(registrar: registrar, tokenStore: store).call();
+    final result = await RegisterDevice(
+      registrar: registrar,
+      tokenStore: store,
+    ).call();
 
     expect(result.status, 'POST /devices berhasil');
     expect(result.failure, isNull);
@@ -39,13 +42,20 @@ void main() {
   });
 
   test('sesi belum aktif -> token TIDAK dikirim, dan alasannya dinyatakan', () async {
-    final result = await RegisterDevice(registrar: registrar, tokenStore: store).call();
+    final result = await RegisterDevice(
+      registrar: registrar,
+      tokenStore: store,
+    ).call();
 
     // Inilah aturan bisnis yang diuji. Tanpa ini, `POST /devices` berjalan
     // tanpa header `Authorization`, backend menolak, dan karena
     // `onTokenRefresh` hanya memicu saat token berubah, token tidak akan pernah
     // dikirim ulang dengan otentikasi yang sah.
-    expect(registrar.calls, 0, reason: 'registrar tidak boleh dipanggil tanpa sesi');
+    expect(
+      registrar.calls,
+      0,
+      reason: 'registrar tidak boleh dipanggil tanpa sesi',
+    );
     expect(result.status, contains('sesi belum aktif'));
   });
 
@@ -56,7 +66,10 @@ void main() {
       failure: const NetworkFailure('Tidak ada koneksi ke server.'),
     );
 
-    final result = await RegisterDevice(registrar: registrar, tokenStore: store).call();
+    final result = await RegisterDevice(
+      registrar: registrar,
+      tokenStore: store,
+    ).call();
 
     expect(result.failure, isA<NetworkFailure>());
     expect(result.failure?.message, 'Tidak ada koneksi ke server.');

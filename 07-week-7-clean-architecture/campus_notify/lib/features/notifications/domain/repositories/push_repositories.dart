@@ -43,7 +43,9 @@ abstract interface class PushTokenSource {
   /// Listener pembaruan WAJIB ada. Token berubah setelah uninstall, clear data,
   /// atau rotasi keamanan; tanpa listener itu backend menyimpan token mati dan
   /// notifikasi tidak pernah sampai tanpa error yang terlihat.
-  Future<void> initialize({required Future<void> Function(String token) onToken});
+  Future<void> initialize({
+    required Future<void> Function(String token) onToken,
+  });
 
   /// Inisialisasi plugin local notifications dan channel Android.
   Future<void> initLocalNotifications();
@@ -77,7 +79,9 @@ abstract interface class TopicSubscription {
   /// dari hasil panggilan terakhir.
   bool get isSubscribed;
 
-  Future<({bool subscribed, Failure? failure})> setSubscribed({required bool value});
+  Future<({bool subscribed, Failure? failure})> setSubscribed({
+    required bool value,
+  });
 }
 
 /// Sumber deep link dari payload notifikasi.

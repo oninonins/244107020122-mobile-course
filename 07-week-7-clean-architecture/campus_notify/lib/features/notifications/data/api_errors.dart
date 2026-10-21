@@ -24,7 +24,9 @@ Failure? readableApiFailure(Object error) {
       401 => const NetworkFailure('Sesi Anda habis. Silakan login kembali.'),
       403 => const NetworkFailure('Anda tidak punya akses ke data ini.'),
       404 => const NetworkFailure('Data tidak ditemukan.'),
-      >= 500 => const NetworkFailure('Server sedang bermasalah. Coba lagi nanti.'),
+      >= 500 => const NetworkFailure(
+        'Server sedang bermasalah. Coba lagi nanti.',
+      ),
       _ => NetworkFailure('Permintaan gagal (HTTP $status).'),
     };
   }
@@ -33,14 +35,16 @@ Failure? readableApiFailure(Object error) {
     DioExceptionType.connectionTimeout ||
     DioExceptionType.sendTimeout ||
     DioExceptionType.receiveTimeout ||
-    DioExceptionType.transformTimeout =>
-      const NetworkFailure('Koneksi lambat. Coba lagi sebentar.'),
-    DioExceptionType.connectionError =>
-      const NetworkFailure('Tidak ada koneksi ke server. Cek jaringan Anda.'),
-    DioExceptionType.badCertificate =>
-      const NetworkFailure('Sertifikat server tidak valid.'),
-    DioExceptionType.cancel =>
-      const NetworkFailure('Permintaan dibatalkan.'),
+    DioExceptionType.transformTimeout => const NetworkFailure(
+      'Koneksi lambat. Coba lagi sebentar.',
+    ),
+    DioExceptionType.connectionError => const NetworkFailure(
+      'Tidak ada koneksi ke server. Cek jaringan Anda.',
+    ),
+    DioExceptionType.badCertificate => const NetworkFailure(
+      'Sertifikat server tidak valid.',
+    ),
+    DioExceptionType.cancel => const NetworkFailure('Permintaan dibatalkan.'),
     DioExceptionType.badResponse || DioExceptionType.unknown =>
       const NetworkFailure('Terjadi masalah jaringan. Periksa koneksi Anda.'),
   };

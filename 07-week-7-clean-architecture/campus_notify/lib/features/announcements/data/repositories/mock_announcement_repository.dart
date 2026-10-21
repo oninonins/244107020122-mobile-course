@@ -15,20 +15,28 @@ import '../../domain/repositories/announcement_repository.dart';
 /// kode mati yang hanya formalitas.
 class MockAnnouncementRepository implements AnnouncementRepository {
   MockAnnouncementRepository({List<Map<String, Object?>>? seed})
-      : _seed = seed ?? defaultSeed;
+    : _seed = seed ?? defaultSeed;
 
   final List<Map<String, Object?>> _seed;
 
   @override
-  Future<({Announcement? announcement, Failure? failure})> fetchById(String id) async {
+  Future<({Announcement? announcement, Failure? failure})> fetchById(
+    String id,
+  ) async {
     await Future<void>.delayed(const Duration(milliseconds: 150));
 
     final row = _seed.where((json) => json['id'] == id).firstOrNull;
     if (row == null) {
-      return (announcement: null, failure: LocalFailure('Pengumuman #$id tidak ditemukan'));
+      return (
+        announcement: null,
+        failure: LocalFailure('Pengumuman #$id tidak ditemukan'),
+      );
     }
 
-    return (announcement: AnnouncementModel.fromJson(row).toEntity(), failure: null);
+    return (
+      announcement: AnnouncementModel.fromJson(row).toEntity(),
+      failure: null,
+    );
   }
 
   /// Data bawaan: isi identik dengan teks yang tadinya hardcoded di widget.

@@ -23,8 +23,9 @@ final getAnnouncementProvider = Provider<GetAnnouncement>((ref) {
 /// Kegagalan diteruskan sebagai `Failure`, bukan dilempar, jadi halaman cukup
 /// membaca `failure.message` tanpa memeriksa tipe apa pun.
 final announcementProvider =
-    FutureProvider.family<({Announcement? announcement, Failure? failure}), String>(
-  (ref, id) {
-    return ref.watch(getAnnouncementProvider).call(id);
-  },
-);
+    FutureProvider.family<
+      ({Announcement? announcement, Failure? failure}),
+      String
+    >((ref, id) {
+      return ref.watch(getAnnouncementProvider).call(id);
+    });

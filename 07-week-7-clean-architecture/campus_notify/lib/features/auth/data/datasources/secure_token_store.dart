@@ -9,7 +9,7 @@ import '../../domain/repositories/token_store.dart';
 /// ada di satu file. Domain hanya melihat kontrak [TokenStore].
 class SecureTokenStore implements TokenStore {
   SecureTokenStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 

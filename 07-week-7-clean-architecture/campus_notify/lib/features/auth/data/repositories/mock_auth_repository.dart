@@ -33,21 +33,32 @@ class MockAuthRepository implements AuthRepository {
     // tidak bolehTgantung pada pemanggilnya. Kalau diuji langsung tanpa use
     // case, ia tetap harus menolak.
     if (!email.contains('@') || password.length < 6) {
-      return (session: null, failure: const AuthFailure('Email atau kata sandi tidak valid'));
+      return (
+        session: null,
+        failure: const AuthFailure('Email atau kata sandi tidak valid'),
+      );
     }
 
     return _issue(email: email);
   }
 
   @override
-  Future<({AuthSession? session, Failure? failure})> refresh(String refreshToken) async {
+  Future<({AuthSession? session, Failure? failure})> refresh(
+    String refreshToken,
+  ) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
     if (refreshToken.isEmpty) {
-      return (session: null, failure: const AuthFailure('Refresh token hilang'));
+      return (
+        session: null,
+        failure: const AuthFailure('Refresh token hilang'),
+      );
     }
     if (refreshAlwaysFails) {
-      return (session: null, failure: const AuthFailure('Refresh token ditolak server'));
+      return (
+        session: null,
+        failure: const AuthFailure('Refresh token ditolak server'),
+      );
     }
 
     final email = refreshToken.split('|').first.replaceFirst('refresh:', '');

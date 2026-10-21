@@ -26,7 +26,10 @@ class Announcement {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Announcement && other.id == id && other.title == title && other.body == body;
+      other is Announcement &&
+          other.id == id &&
+          other.title == title &&
+          other.body == body;
 
   @override
   int get hashCode => Object.hash(id, title, body);

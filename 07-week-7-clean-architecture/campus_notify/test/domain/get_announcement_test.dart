@@ -17,7 +17,9 @@ class FakeAnnouncementRepository implements AnnouncementRepository {
   final Failure? failure;
 
   @override
-  Future<({Announcement? announcement, Failure? failure})> fetchById(String id) async {
+  Future<({Announcement? announcement, Failure? failure})> fetchById(
+    String id,
+  ) async {
     final f = failure;
     if (f != null) return (announcement: null, failure: f);
 
@@ -38,8 +40,16 @@ void main() {
   setUp(() {
     repo = FakeAnnouncementRepository(
       items: const [
-        Announcement(id: '3', title: 'Jadwal kuliah berubah', body: 'Ruang A2 jam 13.00'),
-        Announcement(id: '1', title: 'Pendaftaran UTS dibuka', body: 'Sampai Jumat'),
+        Announcement(
+          id: '3',
+          title: 'Jadwal kuliah berubah',
+          body: 'Ruang A2 jam 13.00',
+        ),
+        Announcement(
+          id: '1',
+          title: 'Pendaftaran UTS dibuka',
+          body: 'Sampai Jumat',
+        ),
       ],
     );
   });
@@ -62,7 +72,9 @@ void main() {
   });
 
   test('repository yang gagal mengembalikan failure dari sumbernya', () async {
-    repo = FakeAnnouncementRepository(failure: const NetworkFailure('Tidak ada koneksi'));
+    repo = FakeAnnouncementRepository(
+      failure: const NetworkFailure('Tidak ada koneksi'),
+    );
 
     final result = await GetAnnouncement(repo).call('3');
 

@@ -34,7 +34,11 @@ class AnnouncementPage extends ConsumerWidget {
           data: (result) {
             final announcement = result.announcement;
             if (announcement == null) {
-              return Center(child: Text(result.failure?.message ?? 'Pengumuman tidak tersedia.'));
+              return Center(
+                child: Text(
+                  result.failure?.message ?? 'Pengumuman tidak tersedia.',
+                ),
+              );
             }
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,

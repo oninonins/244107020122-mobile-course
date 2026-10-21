@@ -28,7 +28,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// merusak apa pun** — persis syarat Liskov. Test di bawah membuktikannya.
 class FakeAuthRepository implements AuthRepository {
   FakeAuthRepository({
-    this.session = const AuthSession(access: 'fake-access', refresh: 'fake-refresh'),
+    this.session = const AuthSession(
+      access: 'fake-access',
+      refresh: 'fake-refresh',
+    ),
     this.failure,
     this.loginCalls = 0,
     this.refreshCalls = 0,
@@ -57,7 +60,9 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<({AuthSession? session, Failure? failure})> refresh(String refreshToken) async {
+  Future<({AuthSession? session, Failure? failure})> refresh(
+    String refreshToken,
+  ) async {
     refreshCalls++;
     final f = failure;
     if (f != null) return (session: null, failure: f);
@@ -72,10 +77,8 @@ void main() {
 
   group('Login meneruskan sesi', () {
     test('kredensial valid menghasilkan session', () async {
-      final result = await Login(repo).call(
-        email: 'mhs@polinema.ac.id',
-        password: 'rahasia123',
-      );
+      final result = await Login(repo)
+          .call(email: 'mhs@polinema.ac.id', password: 'rahasia123');
 
       expect(result.failure, isNull);
       expect(result.session, isNotNull);
@@ -84,19 +87,20 @@ void main() {
     });
 
     test('email dipangkas spasi sebelum dikirim', () async {
-      await Login(repo).call(email: '  mhs@polinema.ac.id  ', password: 'rahasia123');
+      await Login(repo)
+          .call(email: '  mhs@polinema.ac.id  ', password: 'rahasia123');
       expect(repo.loginCalls, 1);
     });
   });
 
   group('Login meneruskan failure tanpa melempar', () {
     test('repository menolak -> failure dikembalikan', () async {
-      repo = FakeAuthRepository(failure: const AuthFailure('Email atau kata sandi tidak valid'));
-
-      final result = await Login(repo).call(
-        email: 'mhs@polinema.ac.id',
-        password: 'rahasia123',
+      repo = FakeAuthRepository(
+        failure: const AuthFailure('Email atau kata sandi tidak valid'),
       );
+
+      final result = await Login(repo)
+          .call(email: 'mhs@polinema.ac.id', password: 'rahasia123');
 
       expect(result.session, isNull);
       expect(result.failure, isA<AuthFailure>());
@@ -107,10 +111,8 @@ void main() {
       repo = FakeAuthRepository(failure: const NetworkFailure('Server mati'));
 
       // Kalau use case melempar, baris ini melempar dan test gagal.
-      final result = await Login(repo).call(
-        email: 'mhs@polinema.ac.id',
-        password: 'rahasia123',
-      );
+      final result = await Login(repo)
+          .call(email: 'mhs@polinema.ac.id', password: 'rahasia123');
       expect(result.failure, isA<NetworkFailure>());
     });
   });
@@ -120,40 +122,53 @@ void main() {
       final result = await Login(repo).call(email: '', password: 'rahasia123');
       expect(result.session, isNull);
       expect(result.failure, isA<ValidationFailure>());
-      expect(repo.loginCalls, 0, reason: 'repository tidak boleh dipanggil untuk input tak valid');
+      expect(
+        repo.loginCalls,
+        0,
+        reason: 'repository tidak boleh dipanggil untuk input tak valid',
+      );
     });
 
     test('email tanpa @ ditolak', () async {
-      final result = await Login(repo).call(email: 'bukan-email', password: 'rahasia123');
+      final result = await Login(repo)
+          .call(email: 'bukan-email', password: 'rahasia123');
       expect(result.failure?.message, 'Format email tidak valid');
       expect(repo.loginCalls, 0);
     });
 
     test('kata sandi kosong ditolak', () async {
-      final result = await Login(repo).call(email: 'mhs@polinema.ac.id', password: '');
+      final result = await Login(repo)
+          .call(email: 'mhs@polinema.ac.id', password: '');
       expect(result.failure?.message, 'Kata sandi wajib diisi');
       expect(repo.loginCalls, 0);
     });
 
     test('kata sandi terlalu pendek ditolak', () async {
-      final result = await Login(repo).call(email: 'mhs@polinema.ac.id', password: '123');
+      final result = await Login(repo)
+          .call(email: 'mhs@polinema.ac.id', password: '123');
       expect(result.failure?.message, 'Minimal 6 karakter');
       expect(repo.loginCalls, 0);
     });
   });
 
   group('Liskov Substitution — fake benar-benar menggantikan repository asli', () {
-    test('semua metode interface mengembalikan record, tidak ada yang melempar', () async {
-      // Kalau ada satu metode yang `throw UnimplementedError()`, pemanggilan
-      // pertama di test ini akan gagal. Ini bukti langsung bahwa fake aman
-      // dipakai sebagai pengganti `MockAuthRepository` yang sungguhan.
-      final subject = repo;
-      final loginResult = await subject.login(email: 'a@b.c', password: '123456');
-      final refreshResult = await subject.refresh('apa saja');
+    test(
+      'semua metode interface mengembalikan record, tidak ada yang melempar',
+      () async {
+        // Kalau ada satu metode yang `throw UnimplementedError()`, pemanggilan
+        // pertama di test ini akan gagal. Ini bukti langsung bahwa fake aman
+        // dipakai sebagai pengganti `MockAuthRepository` yang sungguhan.
+        final subject = repo;
+        final loginResult = await subject.login(
+          email: 'a@b.c',
+          password: '123456',
+        );
+        final refreshResult = await subject.refresh('apa saja');
 
-      expect(loginResult.failure, isNull);
-      expect(refreshResult.failure, isNull);
-    });
+        expect(loginResult.failure, isNull);
+        expect(refreshResult.failure, isNull);
+      },
+    );
 
     test('TokenStore palsu juga tanpa melempar', () async {
       final store = InMemoryTokenStore();

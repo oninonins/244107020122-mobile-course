@@ -61,11 +61,13 @@ DeviceRegistrar buildDeviceRegistrar({
   required AuthRepository auth,
   required String? Function() readToken,
   void Function()? onSessionExpired,
+  void Function()? onSessionRenewed,
 }) {
   final dio = buildApiClient(
     store: store,
     auth: auth,
     onSessionExpired: onSessionExpired,
+    onSessionRenewed: onSessionRenewed,
   );
   return DioDeviceRegistrar(dio: dio, readToken: readToken);
 }

@@ -69,4 +69,30 @@ void main() {
     expect(setelahLogout.maskedAccess, '(kosong)');
     expect(setelahLogout.email, isNull);
   });
+
+  test('alur pada laporan bug: login A, logout, login B', () async {
+    // Test ini meniru langkah yang tertulis di issue #1. Dua test di atas
+    // menutup separuh-separuh; yang ini menempuh alurnya utuh, karena bug asli
+    // muncul justru pada kombinasi logout lalu login dengan akun berbeda.
+    final store = InMemoryTokenStore();
+    final container = buatContainer(store);
+    final auth = container.read(authStateProvider.notifier);
+
+    await auth.login('a@polinema.ac.id', 'rahasia123');
+    final kartuA = await container.read(sessionDebugProvider.future);
+    expect(kartuA.email, 'a@polinema.ac.id');
+
+    await auth.logout();
+    final kartuKosong = await container.read(sessionDebugProvider.future);
+    expect(kartuKosong.email, isNull);
+    expect(kartuKosong.maskedAccess, '(kosong)');
+
+    await auth.login('b@polinema.ac.id', 'rahasia123');
+    final kartuB = await container.read(sessionDebugProvider.future);
+    expect(
+      kartuB.email,
+      'b@polinema.ac.id',
+      reason: 'kartu debug tidak boleh menampilkan sesi A setelah login B',
+    );
+  });
 }

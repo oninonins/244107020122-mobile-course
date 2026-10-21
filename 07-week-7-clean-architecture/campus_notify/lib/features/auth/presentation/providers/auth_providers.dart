@@ -87,7 +87,7 @@ class AuthNotifier extends AsyncNotifier<bool> {
   ///
   /// Sengaja tidak dibuat sebagai use case: operasinya satu baris tanpa aturan
   /// bisnis. Membuat kelas `Logout` hanya untuk membungkus ini adalah
-  /// over-engineering, lihat `docs/ai-challenge.md` tabel keputusan.
+  /// over-engineering — lihat `docs/ai-challenge.md` tabel keputusan.
   Future<void> logout() async {
     await ref.read(tokenStoreProvider).clear();
     // Tanpa ini kartu Debug token tetap menampilkan sesi yang baru dihapus.

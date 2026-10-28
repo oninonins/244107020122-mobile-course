@@ -11,6 +11,7 @@ import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/notifications/data/firebase_push_repository.dart';
 import 'features/notifications/presentation/providers/push_providers.dart';
+import 'features/ocr/presentation/pages/scan_page.dart';
 import 'routes.dart';
 
 /// Composition root: satu-satunya tempat yang tahu semua fitur sekaligus.
@@ -66,6 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) =>
             AnnouncementPage(id: state.pathParameters['id'] ?? ''),
       ),
+      GoRoute(path: Routes.scan, builder: (_, _) => const ScanPage()),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(child: Text('Rute tidak ditemukan: ${state.uri}')),

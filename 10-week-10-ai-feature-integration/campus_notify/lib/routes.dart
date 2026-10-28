@@ -17,5 +17,8 @@ abstract final class Routes {
   /// Prefix untuk mengenali deep link pengumuman.
   static const String announcementPrefix = '/pengumuman/';
 
+  /// Halaman pindai pengumuman dengan AI.
+  static const String scan = '/pindai';
+
   static String announcementDetail(String id) => '$announcementPrefix$id';
 }

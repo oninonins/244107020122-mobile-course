@@ -37,3 +37,38 @@ class AuthFailure extends Failure {
 class ValidationFailure extends Failure {
   const ValidationFailure(super.message);
 }
+
+/// Kegagalan layanan AI: key belum diatur, kuota habis, atau model menolak.
+///
+/// Dipisah dari [NetworkFailure] karena penanganannya berbeda di UI. Kuota habis
+/// butuh saran menunggu, sedangkan key belum diatur butuh saran membuka
+/// pengaturan.
+class AiFailure extends Failure {
+  const AiFailure(
+    super.message, {
+    this.quotaExceeded = false,
+    this.hint,
+    this.retryAfterSeconds,
+  });
+
+  /// Benar bila penyedia menolak karena batas laju atau kuota.
+  ///
+  /// UI memakai ini untuk menampilkan tombol coba lagi, bukan menyuruh pengguna
+  /// mengganti key.
+  final bool quotaExceeded;
+
+  /// Saran tindakan dari penyedia, bila ada.
+  ///
+  /// Diambil dari `error.metadata.remedy_hint` atau `Retry-After`. Ditampilkan
+  /// terpisah dari [message] supaya pesan utama tetap pendek.
+  final String? hint;
+
+  /// Berapa detik pengguna sebaiknya menunggu sebelum mencoba lagi.
+  ///
+  /// Berasal dari header `Retry-After`. Null berarti penyedia tidak memberi
+  /// perkiraan waktu.
+  final int? retryAfterSeconds;
+
+  @override
+  String toString() => hint == null ? message : '$message ($hint)';
+}

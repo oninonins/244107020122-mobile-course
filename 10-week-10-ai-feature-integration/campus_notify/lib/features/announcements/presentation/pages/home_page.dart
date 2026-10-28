@@ -269,6 +269,19 @@ class _HomePageState extends ConsumerState<HomePage> {
               onTap: () => context.push(Routes.announcementDetail('3')),
             ),
           ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              key: const Key('home-scan'),
+              leading: const Icon(Icons.document_scanner_outlined),
+              title: const Text('Pindai Pengumuman'),
+              subtitle: const Text(
+                'Ekstrak teks dari foto pengumuman dengan AI.',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.scan),
+            ),
+          ),
         ],
       ),
     );

@@ -11,12 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// Mengganti `InMemoryTokenStore` supaya guard route dan alur login bisa diuji
 /// tanpa Keychain/Keystore sungguhan.
 Widget _app(TokenStore store) => ProviderScope(
-      overrides: [
-        tokenStoreProvider.overrideWithValue(store),
-        authRepositoryProvider.overrideWithValue(MockAuthRepository()),
-      ],
-      child: const CampusNotifyApp(),
-    );
+  overrides: [
+    tokenStoreProvider.overrideWithValue(store),
+    authRepositoryProvider.overrideWithValue(MockAuthRepository()),
+  ],
+  child: const CampusNotifyApp(),
+);
 
 void main() {
   testWidgets('guard route mengarahkan tamu ke /login', (tester) async {
@@ -49,7 +49,10 @@ void main() {
       find.byKey(const Key('login-email')),
       'mhs@polinema.ac.id',
     );
-    await tester.enterText(find.byKey(const Key('login-password')), 'rahasia123');
+    await tester.enterText(
+      find.byKey(const Key('login-password')),
+      'rahasia123',
+    );
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pumpAndSettle();
 
@@ -58,7 +61,9 @@ void main() {
     expect(await store.readRefresh(), isNotNull);
   });
 
-  testWidgets('debug token tidak pernah menampilkan token penuh', (tester) async {
+  testWidgets('debug token tidak pernah menampilkan token penuh', (
+    tester,
+  ) async {
     final store = InMemoryTokenStore();
     await store.save(
       access: 'mock-access-token-1234567890.sig',
@@ -81,7 +86,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Kartu pengumuman berada di bawah kartu debug FCM, jadi harus digulir dulu.
-await tester.scrollUntilVisible(
+    await tester.scrollUntilVisible(
       find.byKey(const Key('home-announcement')),
       200,
     );
@@ -101,7 +106,10 @@ await tester.scrollUntilVisible(
       find.byKey(const Key('login-email')),
       'mhs@polinema.ac.id',
     );
-    await tester.enterText(find.byKey(const Key('login-password')), 'rahasia123');
+    await tester.enterText(
+      find.byKey(const Key('login-password')),
+      'rahasia123',
+    );
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pumpAndSettle();
 

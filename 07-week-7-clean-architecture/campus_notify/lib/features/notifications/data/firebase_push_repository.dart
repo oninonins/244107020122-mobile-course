@@ -63,7 +63,8 @@ void registerBackgroundHandler() {
 }
 
 /// Implementasi kontrak push di atas Firebase Cloud Messaging.
-class FirebasePushRepository implements PushTokenSource, TopicSubscription, DeepLinkSource {
+class FirebasePushRepository
+    implements PushTokenSource, TopicSubscription, DeepLinkSource {
   @override
   Stream<String> get deepLinks => _deepLinkController.stream;
 
@@ -96,7 +97,9 @@ class FirebasePushRepository implements PushTokenSource, TopicSubscription, Deep
   String? _pendingDeepLink;
 
   @override
-  Future<void> initialize({required Future<void> Function(String token) onToken}) async {
+  Future<void> initialize({
+    required Future<void> Function(String token) onToken,
+  }) async {
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null) {
       _cacheToken(token);
@@ -116,9 +119,14 @@ class FirebasePushRepository implements PushTokenSource, TopicSubscription, Deep
   Future<({bool granted, Failure? failure})> requestPermission() async {
     try {
       if (defaultTargetPlatform == TargetPlatform.android) {
-        final android = _local.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-        return (granted: await android?.requestNotificationsPermission() ?? false, failure: null);
+        final android = _local
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+        return (
+          granted: await android?.requestNotificationsPermission() ?? false,
+          failure: null,
+        );
       }
 
       // Di iOS/macOS hanya Firebase yang menangani dialog izin.
@@ -130,16 +138,22 @@ class FirebasePushRepository implements PushTokenSource, TopicSubscription, Deep
         carPlay: false,
         criticalAlert: false,
       );
-      final granted = settings.authorizationStatus == AuthorizationStatus.authorized ||
+      final granted =
+          settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional;
       return (granted: granted, failure: null);
     } on Object catch (error) {
-      return (granted: false, failure: LocalFailure('Gagal meminta izin: $error'));
+      return (
+        granted: false,
+        failure: LocalFailure('Gagal meminta izin: $error'),
+      );
     }
   }
 
   @override
-  Future<({bool subscribed, Failure? failure})> setSubscribed({required bool value}) async {
+  Future<({bool subscribed, Failure? failure})> setSubscribed({
+    required bool value,
+  }) async {
     try {
       if (value) {
         await FirebaseMessaging.instance.subscribeToTopic(campusTopic);
@@ -149,7 +163,10 @@ class FirebasePushRepository implements PushTokenSource, TopicSubscription, Deep
       _topicSubscribed = value;
       return (subscribed: value, failure: null);
     } on Object catch (error) {
-      return (subscribed: _topicSubscribed, failure: LocalFailure('Gagal mengubah langganan topik: $error'));
+      return (
+        subscribed: _topicSubscribed,
+        failure: LocalFailure('Gagal mengubah langganan topik: $error'),
+      );
     }
   }
 
@@ -194,7 +211,8 @@ class FirebasePushRepository implements PushTokenSource, TopicSubscription, Deep
 
     await _local
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             androidChannelId,

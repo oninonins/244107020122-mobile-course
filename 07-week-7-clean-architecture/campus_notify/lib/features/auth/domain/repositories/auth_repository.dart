@@ -27,5 +27,7 @@ abstract interface class AuthRepository {
   });
 
   /// Menukar refresh token menjadi sesi baru saat access token kedaluwarsa.
-  Future<({AuthSession? session, Failure? failure})> refresh(String refreshToken);
+  Future<({AuthSession? session, Failure? failure})> refresh(
+    String refreshToken,
+  );
 }

@@ -19,11 +19,7 @@ class AnnouncementModel extends Announcement {
     );
   }
 
-  Map<String, Object?> toJson() => {
-        'id': id,
-        'title': title,
-        'body': body,
-      };
+  Map<String, Object?> toJson() => {'id': id, 'title': title, 'body': body};
 
   /// Dipanggil tepat di batas `data -> domain`.
   Announcement toEntity() => Announcement(id: id, title: title, body: body);

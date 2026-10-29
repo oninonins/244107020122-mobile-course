@@ -23,7 +23,9 @@ class AuthSession {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is AuthSession && other.access == access && other.refresh == refresh;
+      other is AuthSession &&
+          other.access == access &&
+          other.refresh == refresh;
 
   @override
   int get hashCode => Object.hash(access, refresh);

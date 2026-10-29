@@ -1,0 +1,102 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+jobs:
+  verify-week-7:
+    name: week 7 format + analyze + test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: 07-week-7-clean-architecture/campus_notify
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Siapkan Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - name: Ambil dependency
+        run: flutter pub get
+
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  verify-week-10:
+    name: week 10 format + analyze + test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: 10-week-10-ai-feature-integration/campus_notify
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Siapkan Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - name: Ambil dependency
+        run: flutter pub get
+
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  verify-week-9:
+    name: week 9 format + analyze + test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: 09-week-9-ai-assisted-development/campus_notify
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Siapkan Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - name: Ambil dependency
+        run: flutter pub get
+
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test

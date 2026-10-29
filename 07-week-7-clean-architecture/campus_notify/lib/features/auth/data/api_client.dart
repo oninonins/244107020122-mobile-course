@@ -9,6 +9,15 @@ const _retriedKey = 'auth_retried';
 
 typedef SessionExpiredCallback = void Function();
 
+/// Dipanggil setelah access token berhasil diperbarui oleh interceptor.
+///
+/// Ada karena secure storage punya dua penulis: `AuthNotifier.login()` dan
+/// interceptor di file ini. Kartu debug membaca penyimpanan itu lewat provider
+/// terpisah, jadi keduanya harus memberi tahu saat isinya berubah. Kalau hanya
+/// jalur login yang memberi tahu, kartu debug menampilkan access token lama
+/// setiap kali token diperbarui diam-diam saat menerima 401.
+typedef SessionRenewedCallback = void Function();
+
 /// Membangun [Dio] yang menempelkan `Authorization: Bearer <access>` pada
 /// setiap request dan, saat menerima 401, menukar refresh token lalu mengulang
 /// request tepat satu kali.
@@ -21,6 +30,7 @@ Dio buildApiClient({
   required AuthRepository auth,
   String baseUrl = 'https://example-campus-api.test',
   SessionExpiredCallback? onSessionExpired,
+  SessionRenewedCallback? onSessionRenewed,
   Dio? inner,
 }) {
   final dio = inner ?? Dio(BaseOptions(baseUrl: baseUrl));
@@ -60,6 +70,10 @@ Dio buildApiClient({
           access: renewed.session!.access,
           refresh: renewed.session!.refresh,
         );
+
+        // Penyimpanan sudah berisi token baru. Pembaca lain perlu tahu.
+        onSessionRenewed?.call();
+
         request.extra[_retriedKey] = true;
         request.headers['Authorization'] = 'Bearer ${renewed.session!.access}';
         final retry = await dio.fetch<dynamic>(request);

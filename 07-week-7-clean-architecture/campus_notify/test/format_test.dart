@@ -11,10 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('maskToken', () {
     test('memotong token panjang jadi 12 karakter pertama', () {
-      expect(
-        maskToken('mock-access-token-1234567890.sig'),
-        'mock-access-...',
-      );
+      expect(maskToken('mock-access-token-1234567890.sig'), 'mock-access-...');
     });
 
     test('menandai token kosong dan null, tidak melempar', () {

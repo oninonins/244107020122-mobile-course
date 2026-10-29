@@ -47,7 +47,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (!mounted || result.session != null) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result.failure?.message ?? 'Login gagal. Coba lagi.')),
+      SnackBar(
+        content: Text(result.failure?.message ?? 'Login gagal. Coba lagi.'),
+      ),
     );
   }
 
@@ -106,7 +108,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         suffixIcon: IconButton(
                           tooltip: _obscure ? 'Tampilkan' : 'Sembunyikan',
                           icon: Icon(
-                            _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            _obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
                           ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),

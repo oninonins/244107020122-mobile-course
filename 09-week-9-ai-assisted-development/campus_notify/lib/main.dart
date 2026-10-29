@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/announcements/presentation/pages/announcement_list_page.dart';
 import 'features/announcements/presentation/pages/announcement_page.dart';
 import 'features/announcements/presentation/pages/home_page.dart';
 import 'features/auth/presentation/pages/login_page.dart';
@@ -65,6 +66,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.announcementPattern,
         builder: (_, state) =>
             AnnouncementPage(id: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: Routes.announcementList,
+        builder: (_, _) => const AnnouncementListPage(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

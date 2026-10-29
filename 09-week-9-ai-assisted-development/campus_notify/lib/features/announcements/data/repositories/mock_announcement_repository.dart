@@ -39,6 +39,26 @@ class MockAnnouncementRepository implements AnnouncementRepository {
     );
   }
 
+  @override
+  Future<({List<Announcement> announcements, Failure? failure})>
+  fetchAll() async {
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+
+    try {
+      final items = _seed
+          .map((json) => AnnouncementModel.fromJson(json).toEntity())
+          .toList();
+      return (announcements: items, failure: null);
+    } on Object catch (e) {
+      // Kegagalan parsing dikembalikan sebagai Failure, bukan dilempar, supaya
+      // satu baris data yang rusak tidak menjatuhkan seluruh halaman.
+      return (
+        announcements: const <Announcement>[],
+        failure: LocalFailure('Gagal membaca daftar pengumuman: $e'),
+      );
+    }
+  }
+
   /// Data bawaan: isi identik dengan teks yang tadinya hardcoded di widget.
   static const List<Map<String, Object?>> defaultSeed = [
     {

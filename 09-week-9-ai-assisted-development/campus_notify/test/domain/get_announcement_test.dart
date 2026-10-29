@@ -7,9 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// Repository palsu pengumuman.
 ///
 /// Sama seperti `FakeAuthRepository`, TIDAK ada `throw UnimplementedError()`
-/// di sini. Interface `AnnouncementRepository` sengaja hanya punya satu metode,
-/// jadi fake tidak punya metode lain yang perlu "di-stub" — dan itu sendiri
-/// adalah bukti bahwa kontrak tidak berlebihan.
+/// di sini. Semua metode mengembalikan record yang wajar, sehingga fake
+/// benar-benar bisa menggantikan implementasi asli.
+///
+/// Catatan Week 9: `fetchAll` ditambahkan ke kontrak untuk fitur pencarian, dan
+/// penambahan itu langsung memecah fake ini saat `flutter analyze` dijalankan.
+/// Itu bukan hal buruk: compiler menunjukkan setiap tempat yang harus ikut
+/// diperbarui ketika kontrak berubah.
 class FakeAnnouncementRepository implements AnnouncementRepository {
   FakeAnnouncementRepository({this.items = const [], this.failure});
 
@@ -31,6 +35,14 @@ class FakeAnnouncementRepository implements AnnouncementRepository {
       );
     }
     return (announcement: found, failure: null);
+  }
+
+  @override
+  Future<({List<Announcement> announcements, Failure? failure})>
+  fetchAll() async {
+    final f = failure;
+    if (f != null) return (announcements: const <Announcement>[], failure: f);
+    return (announcements: items, failure: null);
   }
 }
 

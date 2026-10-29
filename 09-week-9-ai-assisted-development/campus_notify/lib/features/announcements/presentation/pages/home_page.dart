@@ -269,6 +269,17 @@ class _HomePageState extends ConsumerState<HomePage> {
               onTap: () => context.push(Routes.announcementDetail('3')),
             ),
           ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              key: const Key('home-announcement-list'),
+              leading: const Icon(Icons.list_alt_outlined),
+              title: const Text('Daftar Pengumuman'),
+              subtitle: const Text('Lihat dan cari semua pengumuman kampus.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.announcementList),
+            ),
+          ),
         ],
       ),
     );

@@ -13,7 +13,12 @@ class AnnouncementModel extends Announcement {
 
   factory AnnouncementModel.fromJson(Map<String, Object?> json) {
     return AnnouncementModel(
-      id: (json['id'] as num?)?.toString() ?? (json['id'] as String?) ?? '',
+      // `toString()` menerima String maupun angka, dan mengembalikan null
+      // kalau field-nya hilang. Sebelumnya di sini ada `as num?` yang melempar
+      // TypeError untuk id bertipe String, padahal seed repository memakai
+      // String. Bug itu tidak tertangkap test mana pun karena tidak ada test
+      // yang memanggil fromJson langsung.
+      id: json['id']?.toString() ?? '',
       title: (json['title'] as String?) ?? '',
       body: (json['body'] as String?) ?? '',
     );

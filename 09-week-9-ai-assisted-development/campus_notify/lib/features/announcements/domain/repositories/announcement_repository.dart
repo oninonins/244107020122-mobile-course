@@ -3,14 +3,20 @@ import '../entities/announcement.dart';
 
 /// Kontrak sumber data pengumuman.
 ///
-/// Hanya ada `fetchById`, bukan `fetchAll`. Alasannya: satu-satunya tempat yang
-/// membaca pengumuman adalah `announcement_page.dart`, yang menerima `id` dari
-/// deep link FCM (`/pengumuman/3`). Menulis `fetchAll()` sekarang berarti
-/// menebak kebutuhan masa depan — dan metode yang tak terpakai adalah
-/// over-engineering di level yang sama dengan use case yang berlebihan.
+/// Ada dua metode, masing-masing dengan konsumen nyata:
 ///
-/// Kalau nanti ada halaman daftar pengumuman, `fetchAll()` ditambahkan saat itu
-/// juga, bersama use case yang memakainya.
+/// - `fetchById` dipakai `announcement_page.dart`, yang menerima id dari deep
+///   link FCM (`/pengumuman/3`).
+/// - `fetchAll` dipakai `announcement_list_page.dart`, halaman daftar dengan
+///   pencarian.
+///
+/// `fetchAll` sempat ditolak pada Week 7 karena saat itu belum ada yang
+/// memakainya. Penolakan itu benar pada waktunya: metode tanpa konsumen adalah
+/// kode mati. Sekarang konsumennya ada, jadi kontraknya ikut tumbuh.
+///
+/// Aturannya tetap: metode ditambahkan saat ada pemakainya, bukan sebelum.
 abstract interface class AnnouncementRepository {
   Future<({Announcement? announcement, Failure? failure})> fetchById(String id);
+
+  Future<({List<Announcement> announcements, Failure? failure})> fetchAll();
 }

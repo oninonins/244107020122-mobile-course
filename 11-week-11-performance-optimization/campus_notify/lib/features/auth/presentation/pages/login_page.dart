@@ -55,6 +55,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Sengaja TIDAK memakai `select((s) => s.isLoading)`.
+    //
+    // Terdengar seperti optimasi yang benar, tetapi sudah diukur dan hasilnya
+    // nol: setiap perubahan status auth melewati `AsyncLoading`, sehingga
+    // `isLoading` memang berubah false -> true -> false. Kedua rebuild itu
+    // diperlukan, dan `select` tidak menghapus satu pun.
+    //
+    // Buktinya ada di `test/performance/rebuild_count_test.dart` kasus kedua.
     final busy = ref.watch(authStateProvider).isLoading;
 
     return Scaffold(

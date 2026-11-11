@@ -7,9 +7,12 @@ belum.
 | Sumber | Status |
 |---|---|
 | Test dengan penghitung (jumlah pemanggilan, jumlah build) | **Terukur, sudah dijalankan** |
-| Flame chart DevTools (frame time, jank count, memori) | **Belum diisi**, menunggu profiling di perangkat |
+| Flame chart DevTools (jank, FPS) | **Terukur, satu skenario** |
+| Heap usage (tab Memory) | **Belum diukur** |
 
-Tidak ada angka flame chart yang dikarang di dokumen ini.
+Tidak ada angka flame chart yang dikarang di dokumen ini. Angka jank berasal dari
+dua rekaman di `screenshots/`, dan batasannya dijelaskan di bagian
+"Yang belum diukur".
 
 ---
 
@@ -23,9 +26,12 @@ Tidak ada angka flame chart yang dikarang di dokumen ini.
 | Kelas widget di `home_page.dart` | 2 | 5 |
 | Total baris `home_page.dart` | 316 | 352 |
 | Jumlah test | 71 | 80 |
-| Frame time (DevTools) | belum diukur | belum diukur |
-| Jank count (DevTools) | belum diukur | belum diukur |
+| Jank frame (DevTools, profile) | **1** | **0** |
+| Rata-rata FPS (DevTools, profile) | **57** | tidak terbaca |
 | Heap usage (DevTools) | belum diukur | belum diukur |
+
+Catatan: rata-rata FPS sesudah optimasi tidak bisa dinyatakan karena skala sumbu
+Y pada screenshot terpotong. Yang bisa dinyatakan hanya tidak ada frame merah.
 
 ---
 
@@ -189,15 +195,18 @@ dalamnya adalah bukti optimasi.
 
 ## Yang belum diukur
 
-| Metrik | Kenapa belum | Cara mengisi |
+| Metrik | Status | Cara mengisi |
 |---|---|---|
-| Frame time sebelum/sesudah | Butuh `flutter run --profile` di perangkat | Screenshot tab Performance, `screenshots/before-profile.png` dan `after-profile.png` |
-| Jank count | idem | idem |
-| Heap usage | Butuh tab Memory | Heap snapshot sebelum dan sesudah navigasi 5 kali |
-| Dampak `RepaintBoundary` | Hanya terlihat di flame chart | Bandingkan raster thread |
+| Jank frame | **Terukur**: 1 sebelum, 0 sesudah | `screenshots/before-profile.png`, `after-profile.png` |
+| Rata-rata FPS sebelum | **Terukur**: 57 | idem |
+| Rata-rata FPS sesudah | Tidak terbaca, skala sumbu Y terpotong | Rekam ulang dengan zoom penuh |
+| Heap usage | Belum diukur | Heap snapshot sebelum dan sesudah navigasi 5 kali |
+| Dampak `RepaintBoundary` | Belum dipisahkan | Bandingkan raster thread secara terpisah |
 
-Baseline profiling diambil dari Week 9 di `main`, karena salinan Week 11 dibuat
-dari sana dan kode aslinya masih utuh. Yang perlu dilakukan:
+Profiling dilakukan dengan `flutter run --profile` di perangkat Android nyata.
+Mode debug tidak dipakai karena overhead-nya membuat angka tidak sah.
+
+Perintah yang dipakai:
 
 ```bash
 # baseline
@@ -211,6 +220,11 @@ flutter run --profile
 
 Skenario yang sama untuk keduanya: buka Daftar Pengumuman, ketik `jadwal`,
 hapus, kembali ke dashboard, tekan Simulasikan notifikasi.
+
+Satu keterbatasan yang perlu dinyatakan: rekaman "sesudah" memakai zoom yang
+berbeda, sehingga skala sumbu Y-nya terpotong. Karena itu angka FPS sesudah
+optimasi tidak bisa disebutkan. Yang bisa dinyatakan hanya tidak ada frame merah
+pada rentang yang direkam.
 
 ---
 

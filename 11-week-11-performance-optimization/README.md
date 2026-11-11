@@ -69,9 +69,15 @@ rg "toMap|fromMap|toJson|fromJson" lib/features/*/domain
 
 ### Yang belum diukur
 
-Frame time, jank count, dan heap usage **belum ada angkanya**. Ketiganya butuh
-`flutter run --profile` di perangkat dan flame chart dari DevTools. Bagian
-Screenshot di bawah menjelaskan apa yang perlu diambil.
+| Metrik | Status |
+|---|---|
+| Jank frame | **Terukur**: 1 sebelum, 0 sesudah |
+| Rata-rata FPS sebelum | 57, terbaca dari screenshot |
+| Rata-rata FPS sesudah | Tidak terbaca, skala sumbu Y terpotong |
+| Heap usage | Belum diukur, butuh tab Memory |
+
+Angka jank dan FPS berasal dari rekaman `flutter run --profile` di perangkat,
+bukan dari mode debug. Bagian Screenshot di bawah memuat gambarnya.
 
 Tidak ada angka flame chart yang dikarang di README ini.
 
@@ -118,8 +124,10 @@ dibangun ulang saat halaman induk rebuild.
 Dipakai hanya pada kartu FCM, area yang paling sering berubah. Tidak dipasang di
 semua kartu karena setiap boundary menyimpan lapisan tambahan.
 
-Dampaknya belum diukur. Kalau setelah profiling ternyata tidak ada bedanya,
-boundary ini layak dicopot.
+Dampaknya belum dipisahkan dari optimasi lain. Rekaman frame chart yang ada
+memakai skenario gabungan, jadi tidak bisa menunjukkan berapa bagian yang
+berasal dari boundary ini. Kalau ingin dibuktikan, raster thread harus direkam
+terpisah dengan dan tanpa boundary.
 
 ## Satu Optimasi yang Dibatalkan Setelah Diukur
 
@@ -182,32 +190,65 @@ flutter test
 ├── docs/
 │   ├── performance-findings.md   temuan dan yang ditolak
 │   └── performance-report.md     baseline, optimasi, verifikasi
-├── screenshots/            flame chart, menunggu profiling
+├── screenshots/            frame chart sebelum dan sesudah
 └── README.md
 ```
 
 ## Screenshot
 
-Belum diisi. Diperlukan dua gambar flame chart dari DevTools:
+Dua rekaman dari tab **Performance** di DevTools, diambil dengan
+`flutter run --profile` di perangkat Android nyata. Mode profile dipakai karena
+mode debug punya overhead yang membuat angkanya tidak sah.
 
 | Berkas | Isi |
 |---|---|
-| `screenshots/before-profile.png` | Tab Performance, skenario yang sama, dari Week 9 |
-| `screenshots/after-profile.png` | Tab Performance, skenario yang sama, dari Week 11 |
+| `screenshots/before-profile.png` | Week 9, sebelum optimasi |
+| `screenshots/after-profile.png` | Week 11, sesudah optimasi |
 
-Skenario untuk keduanya:
+### Sebelum optimasi
 
-1. Buka Daftar Pengumuman
-2. Ketik `jadwal`
-3. Hapus, kembali ke dashboard
-4. Tekan Simulasikan notifikasi
+![Frame chart Week 9](screenshots/before-profile.png)
 
-Baseline diambil dari Week 9 di `main`, karena kode aslinya masih utuh di sana.
+Yang terlihat:
+
+- Rata-rata **57 FPS**, di bawah target 60.
+- Satu frame **merah** di sekitar frame 633, menembus garis 17 ms sampai
+  sekitar 27 ms. Itu jank: frame yang butuh lebih dari satu kali budget 16,67 ms.
+- Frame sesudahnya masih di atas garis 7 ms, lebih tinggi daripada frame sebelum
+  kejadian.
+
+### Sesudah optimasi
+
+![Frame chart Week 11](screenshots/after-profile.png)
+
+Yang terlihat:
+
+- Tidak ada frame merah pada rentang yang direkam.
+- Semua bar biru, berada jauh di bawah garis 17 ms.
+- Skala sumbu Y pada gambar ini terpotong, jadi rata-rata FPS-nya tidak terbaca
+  dari gambar. Yang bisa dinyatakan hanya tidak ada jank, bukan angka FPS
+  tertentu.
+
+### Yang dibandingkan, dan yang tidak
+
+Yang **bisa** disimpulkan dari dua gambar ini: frame merah hilang. Satu jank
+sebelum optimasi, nol jank sesudahnya.
+
+Yang **tidak bisa** disimpulkan:
+
+- Angka FPS rata-rata sesudah optimasi, karena skala sumbu Y terpotong.
+- Porsi dampak tiap optimasi. Kedua rekaman memakai skenario yang sama, tetapi
+  tidak memisahkan mana yang berasal dari cache, debounce, atau pemisahan state.
+- Dampak `RepaintBoundary`, karena raster thread tidak di-zoom terpisah.
+
+Untuk angka yang pasti, bukti yang dipakai tetap test penghitung: `fetchAll`
+enam kali menjadi satu, dan nol rebuild kartu sesi saat token berubah.
 
 ## Utang dan Batasan
 
-- **Profiling belum dijalankan.** Frame time, jank count, dan heap usage belum
-  ada angkanya. Yang ada baru angka dari test penghitung.
+- **Profiling baru satu skenario.** Jank turun dari 1 menjadi 0 pada rekaman
+  yang ada. Heap usage belum diukur, dan angka FPS sesudah optimasi tidak
+  terbaca karena skala sumbu Y terpotong.
 - **`RepaintBoundary` belum terbukti.** Efeknya hanya terlihat di flame chart.
   Kalau tidak ada bedanya, sebaiknya dicopot.
 - **Debounce belum diuji di perangkat.** Yang diuji baru perilaku provider lewat

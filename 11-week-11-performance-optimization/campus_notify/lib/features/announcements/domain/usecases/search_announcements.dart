@@ -39,14 +39,27 @@ class SearchAnnouncements {
   }
 
   /// Mengambil seluruh pengumuman lalu menyaringnya.
+  ///
+  /// **Catatan Week 11:** metode ini memanggil `fetchAll()` setiap kali
+  /// dipanggil, jadi tidak cocok untuk dipanggil berulang pada setiap ketikan.
+  /// Presentation sekarang memakai [fetchAll] sekali lalu [filter] berkali-kali.
+  /// Metode ini dipertahankan karena masih dipakai test dan berguna kalau nanti
+  /// ada pemakaian sekali-jalan.
   Future<({List<Announcement> announcements, Failure? failure})> call(
     String query,
   ) async {
-    final result = await _repository.fetchAll();
+    final result = await fetchAll();
     if (result.failure != null) {
       return (announcements: const <Announcement>[], failure: result.failure);
     }
 
     return (announcements: filter(result.announcements, query), failure: null);
   }
+
+  /// Mengambil seluruh pengumuman tanpa menyaring.
+  ///
+  /// Dipisah dari [call] supaya presentation bisa menyimpan hasilnya sekali
+  /// lalu menyaring berkali-kali di memori.
+  Future<({List<Announcement> announcements, Failure? failure})> fetchAll() =>
+      _repository.fetchAll();
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/failures.dart';
@@ -52,14 +54,89 @@ class SearchQueryNotifier extends Notifier<String> {
   void clear() => state = '';
 }
 
+/// Jeda sebelum kata kunci dipakai untuk menyaring.
+///
+/// Dibuat provider supaya test bisa menggantinya menjadi 10 ms tanpa membuat
+/// seluruh suite menunggu 300 ms per kasus.
+final debounceDurationProvider = Provider<Duration>(
+  (ref) => const Duration(milliseconds: 300),
+);
+
+/// Kata kunci yang sudah melewati jeda [debounceDurationProvider].
+///
+/// **Kenapa perlu.** Tanpa ini, mengetik "jadwal" berarti lima kali menyaring
+/// dan lima kali rebuild daftar. Dengan jeda, hanya nilai terakhir yang
+/// diteruskan, sehingga penyaringan terjadi sekali.
+///
+/// Nilai kosong diteruskan seketika, bukan ditunda, supaya tombol hapus terasa
+/// langsung dan daftar penuh kembali tanpa jeda.
+final debouncedQueryProvider = NotifierProvider<DebouncedQueryNotifier, String>(
+  DebouncedQueryNotifier.new,
+);
+
+class DebouncedQueryNotifier extends Notifier<String> {
+  Timer? _timer;
+
+  @override
+  String build() {
+    final duration = ref.watch(debounceDurationProvider);
+
+    ref.onDispose(() => _timer?.cancel());
+
+    ref.listen<String>(searchQueryProvider, (previous, next) {
+      _timer?.cancel();
+
+      if (next.trim().isEmpty) {
+        state = '';
+        return;
+      }
+
+      _timer = Timer(duration, () => state = next);
+    });
+
+    return ref.read(searchQueryProvider);
+  }
+}
+
 /// Hasil pencarian. Membaca kata kunci lalu memanggil use case.
 ///
 /// Halaman hanya membaca provider ini, jadi ia tidak tahu apakah hasilnya
 /// disaring di memori atau di basis data.
+///
+/// **Diubah pada Week 11.** Versi sebelumnya memanggil
+/// `SearchAnnouncements.call(query)` di sini, dan use case itu memanggil
+/// `fetchAll()` setiap kali. Karena provider ini menonton kata kunci, setiap
+/// ketikan memicu pengambilan ulang seluruh daftar beserta parsing JSON-nya.
+///
+/// Sekarang daftar diambil sekali oleh [allAnnouncementsProvider], dan provider
+/// ini hanya memfilter di memori lewat [SearchAnnouncements.filter] yang murni.
 final searchResultsProvider =
     FutureProvider<({List<Announcement> announcements, Failure? failure})>((
       ref,
+    ) async {
+      final query = ref.watch(debouncedQueryProvider);
+      final all = await ref.watch(allAnnouncementsProvider.future);
+
+      if (all.failure != null) {
+        return (announcements: const <Announcement>[], failure: all.failure);
+      }
+
+      return (
+        announcements: SearchAnnouncements.filter(all.announcements, query),
+        failure: null,
+      );
+    });
+
+/// Seluruh pengumuman, diambil **sekali**.
+///
+/// Inilah cache-nya. Selama tidak di-invalidate, provider ini tidak memanggil
+/// repository lagi, berapa pun kali kata kunci berubah. `FutureProvider` yang
+/// sudah selesai menyimpan hasilnya selama provider itu hidup.
+///
+/// Invalidate saat data berubah, misalnya setelah menambah pengumuman baru.
+final allAnnouncementsProvider =
+    FutureProvider<({List<Announcement> announcements, Failure? failure})>((
+      ref,
     ) {
-      final query = ref.watch(searchQueryProvider);
-      return ref.watch(searchAnnouncementsProvider).call(query);
+      return ref.watch(searchAnnouncementsProvider).fetchAll();
     });

@@ -31,7 +31,14 @@ class _AnnouncementListPageState extends ConsumerState<AnnouncementListPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(searchResultsProvider);
-    final query = ref.watch(searchQueryProvider);
+
+    // Dua kata kunci, dua kegunaan:
+    // - `searchQueryProvider` untuk kolom teks, supaya huruf muncul seketika
+    //   dan tombol hapus langsung tampil.
+    // - `debouncedQueryProvider` untuk pesan empty state, supaya pesannya
+    //   menyebut kata kunci yang benar-benar dipakai menyaring.
+    final typed = ref.watch(searchQueryProvider);
+    final applied = ref.watch(debouncedQueryProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Pengumuman')),
@@ -39,7 +46,7 @@ class _AnnouncementListPageState extends ConsumerState<AnnouncementListPage> {
         children: [
           _SearchField(
             controller: _controller,
-            query: query,
+            query: typed,
             onChanged: (value) =>
                 ref.read(searchQueryProvider.notifier).set(value),
             onClear: () {
@@ -48,7 +55,7 @@ class _AnnouncementListPageState extends ConsumerState<AnnouncementListPage> {
             },
           ),
           Expanded(
-            child: _ResultBody(state: state, query: query),
+            child: _ResultBody(state: state, query: applied),
           ),
         ],
       ),
